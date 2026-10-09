@@ -1,258 +1,103 @@
-/* MediQ AI digital-twin palette */
+
+/* Cascade order. The app's original stylesheet lives in the `legacy` layer so
+   Tailwind utilities (shadcn/ui components) override it where both apply —
+   unlayered CSS would otherwise beat every utility. Tailwind's preflight reset
+   is deliberately not imported: legacy.css has its own reset, and skipping
+   preflight keeps pages that haven't been migrated looking exactly as before. */
+@layer theme, base, legacy, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "./legacy.css" layer(legacy);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+/* shadcn/ui theme tokens, mapped onto the MediQ palette defined in legacy.css */
 :root {
-  --mediq-navy: #003366;
-  --mediq-blue: #0057A8;
-  --mediq-blue-l: #E8F0F9;
-  --mediq-red: #C8102E;
-  --mediq-red-l: #FDEDF0;
-  --mediq-gold: #B8860B;
-  --mediq-gold-l: #FDF6E3;
-  --mediq-green: #1A6B3C;
-  --mediq-green-l: #E8F5EE;
-  --border: #D8D8D2;
+  --radius: 0.625rem;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--mediq-blue);
+  --primary-foreground: #ffffff;
+  --secondary: var(--mediq-blue-l);
+  --secondary-foreground: var(--mediq-navy);
+  --muted: #f3f2ee;
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--border-soft);
+  --accent-foreground: var(--ink);
+  --destructive: #b42318;
+  --border-color: var(--border);
+  --input: var(--border);
+  --ring-color: var(--mediq-blue);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: "Noto Sans", sans-serif;
-  background: #EEF1F5;
-  color: #1A1A1A;
-  font-size: 14px;
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-display: var(--font-fraunces), "Noto Serif", serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border-color);
+  --color-input: var(--input);
+  --color-ring: var(--ring-color);
+  --color-navy: var(--mediq-navy);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-.mediq-nav {
-  background: var(--mediq-navy);
-  border-bottom: 3px solid var(--mediq-red);
-  padding: 12px 32px;
-  color: white;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.nav-links { display: flex; gap: 20px; }
-.nav-links a {
-  color: rgba(255, 255, 255, 0.8);
-  text-decoration: none;
-  font-size: 12px;
-  font-weight: 500;
-}
-.nav-links a:hover { color: white; border-bottom: 2px solid var(--mediq-red); }
-.logo-name { font-weight: 600; font-size: 15px; }
-.logo-sub { font-size: 12px; font-weight: 500; opacity: 0.82; letter-spacing: 0.2px; }
+/* The parts of Tailwind's preflight that shadcn components rely on. The full
+   preflight stays out so unmigrated pages don't shift; everything here sits in
+   the `base` layer, below legacy.css, so legacy button classes still win. */
+@layer base {
+  /* Without preflight, borders need a default style/colour for shadcn's `border` utilities. */
+  *, ::before, ::after { border-color: var(--color-border); }
 
-.page { max-width: 960px; margin: 24px auto; padding: 0 24px; }
-
-.panel {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  margin-bottom: 16px;
-  overflow: hidden;
-}
-.panel-head {
-  background: var(--mediq-navy);
-  color: white;
-  padding: 10px 16px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
-.panel-body { padding: 16px; }
-
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-label { display: block; font-size: 11px; color: #555; margin-bottom: 4px; font-weight: 500; }
-select, input {
-  width: 100%; padding: 8px 10px; border: 1px solid var(--border);
-  border-radius: 3px; font-size: 13px; font-family: inherit;
-}
-button.primary {
-  grid-column: 1 / -1;
-  padding: 10px; background: var(--mediq-navy); color: white;
-  border: none; border-radius: 3px; font-size: 13px; font-weight: 500; cursor: pointer;
-}
-button.primary:hover { background: var(--mediq-blue); }
-button.secondary {
-  grid-column: 1 / -1;
-  padding: 10px; background: white; color: var(--mediq-navy);
-  border: 1px solid var(--mediq-navy); border-radius: 3px;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-}
-button.secondary:hover { background: var(--mediq-blue-l); border-color: var(--mediq-blue); color: var(--mediq-blue); }
-
-/* KPI number scale — one primary size, one secondary size, used everywhere
-   instead of ad hoc inline font-sizes so every "big number" reads at a
-   consistent visual weight across pages. */
-.estimate-value, .kpi-primary { font-size: 42px; font-weight: 300; font-family: "Noto Serif", serif; }
-.kpi-secondary { font-size: 22px; margin-top: 6px; }
-.band-green { color: var(--mediq-green); }
-.band-amber { color: var(--mediq-gold); }
-.band-red { color: var(--mediq-red); }
-
-/* Redundant color+text status chip — pairs with band-*/status colors so
-   severity never depends on hue alone (colorblind-safe). */
-.band-chip {
-  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
-  padding: 2px 8px; border-radius: 20px; margin-left: 8px; vertical-align: middle;
-}
-.band-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
-.band-chip.green { background: var(--mediq-green-l); color: var(--mediq-green); }
-.band-chip.green::before { background: var(--mediq-green); }
-.band-chip.amber { background: var(--mediq-gold-l); color: var(--mediq-gold); }
-.band-chip.amber::before { background: var(--mediq-gold); }
-.band-chip.red { background: var(--mediq-red-l); color: var(--mediq-red); }
-.band-chip.red::before { background: var(--mediq-red); }
-
-.estimate-card { border-left: 4px solid var(--border); padding: 14px 16px; border-radius: 3px; }
-.estimate-card.green { background: var(--mediq-green-l); border-left-color: var(--mediq-green); }
-.estimate-card.amber { background: var(--mediq-gold-l); border-left-color: var(--mediq-gold); }
-.estimate-card.red { background: var(--mediq-red-l); border-left-color: var(--mediq-red); }
-
-/* SOP Q&A — full chat page */
-.qa-page {
-  display: flex; flex-direction: column;
-  height: calc(100vh - 150px); min-height: 480px;
-}
-.qa-page .panel-body { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-bottom: 12px; }
-
-.qa-banner {
-  background: var(--mediq-gold-l); border-left: 3px solid var(--mediq-gold);
-  padding: 9px 12px; border-radius: 3px; font-size: 11px; margin-bottom: 12px;
-}
-.qa-banner code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 2px; }
-
-.qa-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.qa-clear-btn {
-  font-size: 11px; color: #777; background: none; border: 1px solid var(--border);
-  border-radius: 3px; padding: 4px 10px; cursor: pointer;
-}
-.qa-clear-btn:hover { color: var(--mediq-navy); border-color: var(--mediq-navy); }
-
-.qa-thread { flex: 1; overflow-y: auto; padding-right: 4px; }
-
-.qa-empty {
-  height: 100%; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; text-align: center; color: #777; gap: 4px;
-}
-.qa-empty h3 { font-weight: 500; color: #333; font-size: 15px; margin-bottom: 4px; }
-.qa-suggestions { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; width: 100%; max-width: 440px; }
-.qa-suggestion-btn {
-  text-align: left; background: white; border: 1px solid var(--border);
-  border-radius: 6px; padding: 9px 12px; font-size: 12px; color: var(--mediq-blue);
-  cursor: pointer; font-family: inherit;
-}
-.qa-suggestion-btn:hover { background: var(--mediq-blue-l); border-color: var(--mediq-blue); }
-
-.qa-msg { padding: 10px 12px; border-radius: 4px; margin-bottom: 8px; font-size: 13px; }
-.qa-msg.user { background: var(--mediq-blue-l); margin-left: 15%; }
-.qa-msg.assistant { background: #F4F4F2; margin-right: 15%; }
-.qa-msg.error { background: var(--mediq-red-l); border-left: 3px solid var(--mediq-red); margin-right: 15%; }
-.qa-msg-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; gap: 8px; }
-.qa-role { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #777; }
-.qa-time { font-size: 10px; color: #999; white-space: nowrap; }
-.qa-text { white-space: pre-wrap; line-height: 1.5; }
-
-.qa-typing { display: inline-flex; gap: 3px; padding: 4px 0; }
-.qa-typing span {
-  width: 6px; height: 6px; border-radius: 50%; background: #aaa; display: inline-block;
-  animation: qa-bounce 1.2s infinite ease-in-out;
-}
-.qa-typing span:nth-child(2) { animation-delay: 0.15s; }
-.qa-typing span:nth-child(3) { animation-delay: 0.3s; }
-@keyframes qa-bounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-  40% { transform: translateY(-4px); opacity: 1; }
+  /* Strip the browser's native button chrome (raised/embossed border, grey
+     fill) so buttons are flat until a class styles them. */
+  button,
+  input:where([type="button"], [type="reset"], [type="submit"]) {
+    appearance: button;
+    background-color: transparent;
+    background-image: none;
+    border: 0 solid;
+    border-radius: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+  }
 }
 
-.qa-chip {
-  display: inline-block; margin-top: 8px; font-size: 10px;
-  background: var(--mediq-gold-l); color: var(--mediq-gold);
-  border: 1px solid #E0C97A; border-radius: 2px; padding: 1px 8px;
+/* Modern thin scrollbars (no arrow buttons, rounded thumb, transparent track).
+   Chromium/Safari use the ::-webkit-scrollbar styles; Firefox, which lacks
+   them, gets the standard properties. Setting the standard properties in
+   Chromium would override the webkit styles, hence the @supports split. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb {
+  background-color: #d3d2ca;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
 }
-
-.qa-sources { margin-top: 8px; }
-.qa-sources summary {
-  cursor: pointer; font-size: 10px; color: #777; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.4px; list-style: none;
+::-webkit-scrollbar-thumb:hover { background-color: #a9a89f; }
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: #d3d2ca transparent; }
 }
-.qa-sources summary::-webkit-details-marker { display: none; }
-.qa-sources summary::before { content: "▸ "; }
-.qa-sources[open] summary::before { content: "▾ "; }
-.qa-sources-list { margin-top: 6px; }
-.qa-source {
-  font-size: 11px; padding: 6px 10px; background: white;
-  border: 1px solid var(--border); border-radius: 3px; margin-bottom: 4px;
-}
-
-.qa-input-row { display: flex; gap: 8px; margin-top: 12px; align-items: flex-end; }
-.qa-textarea {
-  flex: 1; resize: none; padding: 8px 10px; border: 1px solid var(--border);
-  border-radius: 3px; font-size: 13px; font-family: inherit; line-height: 1.4;
-  max-height: 140px; overflow-y: auto;
-}
-.qa-send-btn { width: 84px; height: 38px; flex-shrink: 0; }
-
-/* agent console alerts */
-.alert-row {
-  padding: 9px 12px; margin-bottom: 6px; border-radius: 3px;
-  border-left: 3px solid; font-size: 12px;
-}
-.alert-row.crit { background: var(--mediq-red-l); border-left-color: var(--mediq-red); }
-.alert-row.warn { background: var(--mediq-gold-l); border-left-color: var(--mediq-gold); }
-
-/* stations dashboard */
-.clinic-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-.tab {
-  padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
-  background: white; color: var(--mediq-navy);
-  border: 1px solid var(--border); border-radius: 3px;
-}
-.tab.active { background: var(--mediq-navy); color: white; border-color: var(--mediq-navy); }
-
-.station-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
-.station-card {
-  border: 1px solid var(--border); border-top: 3px solid var(--border);
-  border-radius: 4px; padding: 12px 14px; background: white;
-}
-.station-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 6px; }
-.station-median { font-size: 26px; font-weight: 300; font-family: "Noto Serif", serif; line-height: 1.1; margin-bottom: 4px; }
-.station-reg {
-  display: inline-block; margin-top: 6px; font-size: 10px; font-weight: 600;
-  background: var(--mediq-blue-l); color: var(--mediq-blue);
-  border-radius: 2px; padding: 2px 8px;
-}
-.hourly-bars { display: flex; align-items: flex-end; gap: 2px; height: 44px; margin-top: 10px; }
-.hourly-bar { flex: 1; border-radius: 1px 1px 0 0; min-width: 4px; }
-.hourly-axis { display: flex; justify-content: space-between; font-size: 9px; color: #999; margin-top: 2px; }
-
-.evidence-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
-.evidence-table th {
-  background: #F4F4F2; text-align: left; padding: 6px 8px;
-  font-size: 10px; text-transform: uppercase; color: #555;
-  border-bottom: 1px solid var(--border);
-}
-.evidence-table td { padding: 6px 8px; border-bottom: 1px solid #E8E8E4; }
-.muted { color: #777; font-size: 12px; }
-
-/* Document management (knowledge base ingestion) */
-.doc-upload {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 14px; border: 1px dashed var(--border); border-radius: 4px;
-  background: #FAFAF8; margin-bottom: 16px;
-}
-.doc-upload input[type="file"] { flex: 1; min-width: 220px; font-size: 12px; }
-.doc-upload-hint { font-size: 11px; color: #777; width: 100%; }
-
-.doc-actions { display: flex; gap: 6px; }
-.btn-small {
-  padding: 4px 10px; font-size: 11px; font-weight: 500; border-radius: 3px;
-  cursor: pointer; border: 1px solid var(--border); background: white; color: #333;
-}
-.btn-small:hover { border-color: var(--mediq-blue); color: var(--mediq-blue); }
-.btn-small.danger { color: var(--mediq-red); }
-.btn-small.danger:hover { border-color: var(--mediq-red); background: var(--mediq-red-l); }
-.btn-small:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.doc-name { font-weight: 500; }
-.doc-error { color: var(--mediq-red); font-size: 10px; margin-top: 2px; }

@@ -1,14 +1,18 @@
+import json
 import random
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field, field_validator
 from qdrant_client import models
 
 from app.agents.graph import wait_estimate_graph
-from app.agents.qa_graph import qa_graph
+from app.agents.qa_graph import qa_graph, suggest_followups
+from app.agents.qa_personas import PERSONAS, Length, Register, catalogue, resolve_style
 from app.agents.supervisor_graph import supervisor_graph
 from app.config import settings
 from app.schemas import (
@@ -23,7 +27,7 @@ from app.schemas import (
     SamplePatient,
     SimilarEvent,
 )
-from app.services import document_registry, livestate, models_service, registry, stations
+from app.services import document_registry, livestate, models_service, qa_feedback, registry, stations, topics
 from app.services.pathway import build_pathway, classify
 from app.services.qdrant_service import collection_status, get_client
 from app.services.sop_ingest import SUPPORTED_EXTENSIONS, ingest_file
@@ -356,7 +360,70 @@ def agent_dataset_range() -> dict:
 
 
 class QARequest(BaseModel):
-    question: str = Field(..., min_length=3, max_length=1000)
+    # Any non-blank text: short greetings like "hi" are normal chat input.
+    question: str = Field(..., max_length=1000)
+
+    @field_validator("question")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Please type a question.")
+        return v
+    # All optional: unset persona -> QA_DEFAULT_PERSONA; unset style -> persona's defaults.
+    persona: str | None = None
+    length: Length | None = None
+    technical_level: Register | None = None
+
+    def graph_input(self) -> dict:
+        """Initial graph state with persona/style resolved (unknown persona -> 422)."""
+        from langchain_core.messages import HumanMessage
+
+        if self.persona is not None and self.persona not in PERSONAS:
+            raise HTTPException(422, f"Unknown persona '{self.persona}'. "
+                                     f"Options: {', '.join(PERSONAS)}")
+        persona, length, register = resolve_style(
+            self.persona or settings.qa_default_persona, self.length, self.technical_level)
+        return {"messages": [HumanMessage(self.question)], "citations": [],
+                "persona": persona.id, "length": length, "register": register}
+
+
+def _style_info(state: dict) -> dict:
+    return {"persona": state["persona"], "persona_name": PERSONAS[state["persona"]].name,
+            "length": state["length"], "technical_level": state["register"]}
+
+
+class QAFeedback(BaseModel):
+    session_id: str = Field(..., min_length=1, max_length=100)
+    message_id: str = Field(..., min_length=1, max_length=100)
+    # None clears a previous rating (the user un-clicked the thumb).
+    rating: Literal["up", "down"] | None
+    reason: str | None = Field(None, max_length=200)
+    question: str = Field("", max_length=2000)
+    answer: str = Field("", max_length=20000)
+    persona: str | None = None
+
+
+@router.post("/qa/feedback", status_code=204)
+def qa_feedback_submit(fb: QAFeedback) -> None:
+    """Thumbs up/down on an answer (one rating per answer; re-rating overwrites)."""
+    if fb.rating is None:
+        qa_feedback.clear(fb.session_id, fb.message_id)
+    else:
+        qa_feedback.upsert(fb.session_id, fb.message_id, fb.rating, fb.reason,
+                           fb.question, fb.answer, fb.persona)
+
+
+@router.get("/qa/feedback/summary")
+def qa_feedback_summary() -> dict:
+    """Totals and per-persona counts, plus recent thumbs-down reasons."""
+    return qa_feedback.summary()
+
+
+@router.get("/qa/personas")
+def qa_personas() -> dict:
+    """Personas and answer-style options for the Q&A page's pickers."""
+    return catalogue(settings.qa_default_persona)
 
 
 @router.post("/qa/ask")
@@ -368,24 +435,127 @@ def qa_ask(req: QARequest) -> dict:
     if not settings.openai_api_key:
         raise HTTPException(503, "SOP Q&A requires OPENAI_API_KEY to be configured.")
 
-    from langchain_core.messages import HumanMessage
+    from langchain_core.messages import AIMessage, ToolMessage
 
-    result = qa_graph.invoke({"messages": [HumanMessage(req.question)], "citations": []})
-
-    seen: set[tuple[str, str]] = set()
-    sources = []
-    for c in result.get("citations", []):
-        key = (c["title"], c["snippet"])
-        if key not in seen:
-            seen.add(key)
-            sources.append(c)
+    state = req.graph_input()
+    result = qa_graph.invoke(state)
+    # .text flattens Responses-API content blocks into a plain string
+    answer = str(result["messages"][-1].text)
+    passages = [str(m.content) for m in result["messages"] if isinstance(m, ToolMessage)]
+    covered, sources = _coverage(result.get("citations", []))
 
     return {
         "status": "ok",
         "question": req.question,
-        "answer": result["messages"][-1].content,
+        **_style_info(state),
+        "answer": answer,
+        "covered": covered,
         "sources": sources,
+        "thinking": _qa_thinking(m for m in result["messages"] if isinstance(m, AIMessage)),
+        # Not covered: the UI offers the knowledge-base topics instead.
+        "followups": suggest_followups(req.question, answer, passages, state["persona"]) if covered else [],
     }
+
+
+@router.post("/qa/ask/stream")
+def qa_ask_stream(req: QARequest) -> StreamingResponse:
+    """Same agent as /qa/ask, streamed as Server-Sent Events so the answer renders
+    as it is generated. Events (JSON in `data:`):
+      {"type": "thinking", "step": {kind, text}}  — a search or reasoning summary
+      {"type": "token", "text": "..."}            — answer text delta
+      {"type": "start", persona, persona_name, length, technical_level} — resolved style, first
+      {"type": "done", answer, covered, sources, thinking} — final, authoritative result
+      {"type": "followups", "questions": [...]}   — suggested next questions, after done
+      {"type": "error", "message": "..."}"""
+    if not settings.openai_api_key:
+        raise HTTPException(503, "SOP Q&A requires OPENAI_API_KEY to be configured.")
+
+    from langchain_core.messages import AIMessage, AIMessageChunk, ToolMessage
+
+    state = req.graph_input()  # before streaming starts, so a bad persona is a real 422
+
+    def sse(payload: dict) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    def events():
+        citations: list[dict] = []
+        thinking: list[dict] = []
+        passages: list[str] = []
+        answer = ""
+        try:
+            yield sse({"type": "start", **_style_info(state)})
+            for mode, data in qa_graph.stream(state, stream_mode=["updates", "messages"]):
+                if mode == "messages":
+                    chunk, meta = data
+                    if meta.get("langgraph_node") == "agent" and isinstance(chunk, AIMessageChunk):
+                        text = str(chunk.text)
+                        if text:
+                            yield sse({"type": "token", "text": text})
+                    continue
+                # "updates": {node: update}; ToolNode's Command updates arrive as a list
+                for node, update in data.items():
+                    for upd in update if isinstance(update, list) else [update]:
+                        if not isinstance(upd, dict):
+                            continue
+                        citations += upd.get("citations", [])
+                        passages += [str(m.content) for m in upd.get("messages", [])
+                                     if isinstance(m, ToolMessage)]
+                        ai_msgs = [m for m in upd.get("messages", []) if isinstance(m, AIMessage)]
+                        for step in _qa_thinking(ai_msgs):
+                            thinking.append(step)
+                            yield sse({"type": "thinking", "step": step})
+                        if node == "agent" and ai_msgs and not ai_msgs[-1].tool_calls:
+                            answer = str(ai_msgs[-1].text)
+            covered, sources = _coverage(citations)
+            yield sse({"type": "done", "answer": answer, "covered": covered,
+                       "sources": sources, "thinking": thinking})
+            # After "done" so the answer never waits on suggestions. Not covered:
+            # the UI offers the knowledge-base topics instead.
+            followups = suggest_followups(req.question, answer, passages, state["persona"]) if covered else []
+            if followups:
+                yield sse({"type": "followups", "questions": followups})
+        except Exception as e:  # surface to the client; the HTTP status is already 200
+            yield sse({"type": "error", "message": str(e)[:300]})
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _coverage(citations: list[dict]) -> tuple[bool, list[dict]]:
+    """Whether the knowledge base covers the question: the best reranked passage
+    across every search must clear QA_COVERED_MIN_SCORE. Not covered -> no
+    sources, since the passages retrieved are only the least-bad matches."""
+    best = max((c.get("score", float("-inf")) for c in citations), default=float("-inf"))
+    covered = best >= settings.qa_covered_min_score
+    return covered, _dedupe_sources(citations) if covered else []
+
+
+def _dedupe_sources(citations: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str]] = set()
+    sources = []
+    for c in citations:
+        key = (c["title"], c["snippet"])
+        if key not in seen:
+            seen.add(key)
+            sources.append(c)
+    return sources
+
+
+def _qa_thinking(ai_messages) -> list[dict]:
+    """The agent's visible trail, in order: reasoning summaries (only emitted at
+    high reasoning effort) and each knowledge-base search it ran."""
+    steps: list[dict] = []
+    for msg in ai_messages:
+        blocks = msg.content if isinstance(msg.content, list) else []
+        for block in blocks:
+            if isinstance(block, dict) and block.get("type") == "reasoning":
+                for part in block.get("summary") or []:
+                    if part.get("text", "").strip():
+                        steps.append({"kind": "reasoning", "text": part["text"].strip()})
+        for call in msg.tool_calls:
+            query = call.get("args", {}).get("query", "")
+            steps.append({"kind": "search", "text": f'Searched SOP knowledge base: "{query}"'})
+    return steps
 
 
 def _document_out(row) -> DocumentOut:
@@ -428,6 +598,8 @@ def upload_document(file: UploadFile = File(...)) -> DocumentOut:
         document_registry.update_status(document_id, "ingested", chunk_count=n)
     except Exception as exc:
         document_registry.update_status(document_id, "failed", error_message=str(exc))
+    else:
+        topics.ensure_topics()  # one LLM call unless it duplicates an existing document
 
     return _document_out(document_registry.get(document_id))
 
@@ -453,22 +625,64 @@ def reingest_document(document_id: str) -> DocumentOut:
         document_registry.update_status(document_id, "ingested", chunk_count=n)
     except Exception as exc:
         document_registry.update_status(document_id, "failed", error_message=str(exc))
+    else:
+        document_registry.clear_topic(document_id)
+        topics.ensure_topics()
 
     return _document_out(document_registry.get(document_id))
+
+
+def _remove_document(document_id: str) -> None:
+    row = document_registry.get(document_id)
+    if not row:
+        raise HTTPException(404, "Document not found")
+    delete_document(get_client(), document_id)
+    document_registry.delete(document_id)
+    # Bulk ingestion can register one file under several rows: only delete the
+    # file once no remaining row points at it.
+    path = Path(row["file_path"])
+    still_used = any(Path(r["file_path"]) == path for r in document_registry.list_all())
+    if path.exists() and not still_used:
+        path.unlink()
 
 
 @router.delete("/documents/{document_id}", status_code=204)
 def delete_document_endpoint(document_id: str) -> None:
     """Remove a document's chunks from Qdrant, its file on disk, and its registry row."""
-    row = document_registry.get(document_id)
-    if not row:
-        raise HTTPException(404, "Document not found")
+    _remove_document(document_id)
 
-    delete_document(get_client(), document_id)
-    path = Path(row["file_path"])
-    if path.exists():
-        path.unlink()
-    document_registry.delete(document_id)
+
+@router.get("/qa/topics")
+def qa_topics() -> dict:
+    """What the SOP assistant can answer: one topic per distinct document
+    (identical uploads grouped), with a summary and example questions."""
+    return {"topics": topics.catalogue()}
+
+
+def _topic_or_404(topic_id: str) -> dict:
+    topic = next((t for t in topics.catalogue() if t["id"] == topic_id), None)
+    if not topic:
+        raise HTTPException(404, "Topic not found")
+    return topic
+
+
+@router.post("/documents/topics/{topic_id}/regenerate")
+def regenerate_topic(topic_id: str) -> dict:
+    """Write a fresh topic card for one group from its document text."""
+    _topic_or_404(topic_id)
+    topics.ensure_topics(regenerate_group=topic_id)
+    return _topic_or_404(topic_id)
+
+
+@router.post("/documents/topics/{topic_id}/merge")
+def merge_duplicates(topic_id: str) -> dict:
+    """Keep one document of a duplicate group (the human-named copy, else the
+    oldest) and remove the identical copies from Qdrant, disk and the registry."""
+    _topic_or_404(topic_id)
+    keep, remove = topics.keep_document(topic_id)
+    for document_id in remove:
+        _remove_document(document_id)
+    return {"kept": keep, "removed": remove}
 
 
 @router.get("/collection/status")

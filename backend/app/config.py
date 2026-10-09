@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     sop_chunk_overlap: int = 200
     sop_retrieval_k: int = 15
     sop_rerank_top_n: int = 5
+    # gpt-6-luna only emits reasoning summaries ("thinking") at high effort;
+    # low/medium skip reasoning entirely on typical SOP questions.
+    qa_reasoning_effort: str = "high"
+    # Persona used when a request doesn't pick one (ids in app/agents/qa_personas.py).
+    qa_default_persona: str = "clinical_staff"
+    # Best cross-encoder score below this = the knowledge base doesn't cover the
+    # question (calibrated: covered questions scored -3.5..6.5, off-topic <= -7.5).
+    qa_covered_min_score: float = -5.0
 
 
 settings = Settings()

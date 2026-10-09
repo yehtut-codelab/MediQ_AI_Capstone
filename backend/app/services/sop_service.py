@@ -63,6 +63,24 @@ def search_sop(client: QdrantClient, query_vector: list[float], limit: int = 15)
     return [{"score": h.score, **h.payload} for h in hits]
 
 
+def document_text(client: QdrantClient, document_id: str) -> str:
+    """A document's indexed text, rebuilt from its chunks in order — works even
+    when the source file is no longer on disk."""
+    name = settings.qdrant_sop_collection
+    if not client.collection_exists(name):
+        return ""
+    selector = Filter(must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))])
+    points, offset = [], None
+    while True:
+        batch, offset = client.scroll(collection_name=name, scroll_filter=selector, limit=256,
+                                      offset=offset, with_payload=True, with_vectors=False)
+        points.extend(batch)
+        if offset is None:
+            break
+    points.sort(key=lambda p: p.payload.get("chunk_index", 0))
+    return "\n".join(p.payload.get("text", "") for p in points)
+
+
 def delete_document(client: QdrantClient, document_id: str) -> None:
     """Remove all chunks belonging to one document (e.g. before re-ingesting or on delete)."""
     name = settings.qdrant_sop_collection

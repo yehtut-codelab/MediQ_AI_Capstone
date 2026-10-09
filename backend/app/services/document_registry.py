@@ -27,10 +27,25 @@ CREATE TABLE IF NOT EXISTS sop_documents (
 """
 
 
+# Columns added after the first release; applied idempotently on connect (same
+# ALTER-if-missing pattern as registry.py).
+#   content_hash — fingerprint of the extracted text; identical files share it
+#   topic_json   — generated topic card (name, kind, summary, example_questions)
+_MIGRATIONS = {
+    "content_hash": "ALTER TABLE sop_documents ADD COLUMN content_hash TEXT",
+    "topic_json": "ALTER TABLE sop_documents ADD COLUMN topic_json TEXT",
+    "topic_at": "ALTER TABLE sop_documents ADD COLUMN topic_at TEXT",
+}
+
+
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(sop_documents)")}
+    for column, ddl in _MIGRATIONS.items():
+        if column not in existing:
+            conn.execute(ddl)
     return conn
 
 
@@ -76,3 +91,26 @@ def list_all() -> list[sqlite3.Row]:
 def delete(document_id: str) -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM sop_documents WHERE id = ?", (document_id,))
+
+
+def set_content_hash(document_id: str, content_hash: str) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE sop_documents SET content_hash = ? WHERE id = ?",
+                     (content_hash, document_id))
+
+
+def clear_topic(document_id: str) -> None:
+    """After a reingest the content may differ: recompute fingerprint and topic."""
+    with _connect() as conn:
+        conn.execute("UPDATE sop_documents SET content_hash = NULL, topic_json = NULL, "
+                     "topic_at = NULL WHERE id = ?", (document_id,))
+
+
+def set_topic(document_ids: list[str], topic_json: str) -> None:
+    """Store one topic card on every document of a duplicate group."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _connect() as conn:
+        conn.executemany(
+            "UPDATE sop_documents SET topic_json = ?, topic_at = ? WHERE id = ?",
+            [(topic_json, now, d) for d in document_ids],
+        )

@@ -87,6 +87,22 @@ const SERVICE_TYPE_TO_CATEGORY: Record<string, string> = {
   "Financial Con": "other",
 };
 
+// Sample patients come from the historical corpus, so their arrival dates are
+// months old. Both estimators only care about weekday and time-of-day, so the
+// sample is moved to the most recent past occurrence of the same weekday at
+// the same time — the scenario reads as current without changing its features.
+function recentSameWeekday(iso: string): string {
+  const [y, mo, d] = iso.slice(0, 10).split("-").map(Number);
+  const [h, mi] = iso.slice(11, 16).split(":").map(Number);
+  const weekday = new Date(y, mo - 1, d).getDay();
+  const now = new Date();
+  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, mi);
+  t.setDate(t.getDate() - ((t.getDay() - weekday + 7) % 7));
+  if (t > now) t.setDate(t.getDate() - 7);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(h)}:${pad(mi)}`;
+}
+
 export default function ArrivalSimulator() {
   const [clinic, setClinic] = useState("TTSH Eye Centre");
   const [category, setCategory] = useState("consultation");
@@ -123,7 +139,7 @@ export default function ArrivalSimulator() {
       const [s]: SamplePatient[] = await res.json();
       setClinic(s.clinic);
       setCategory(SERVICE_TYPE_TO_CATEGORY[s.service_type] ?? "other");
-      setArrival(s.arrival_iso.slice(0, 16));
+      setArrival(recentSameWeekday(s.arrival_iso));
       setSample(s);
       setResult(null);
       setSimResult(null);
@@ -293,7 +309,9 @@ export default function ArrivalSimulator() {
           {sample && (
             <p className="muted" style={{ marginTop: 10 }}>
               Sample patient #{sample.patient_id} · historical station {sample.service_point} ·
-              actually waited {sample.actual_wait_min.toFixed(0)} min
+              actually waited {sample.actual_wait_min.toFixed(0)} min · originally arrived{" "}
+              {sample.arrival_iso.slice(0, 16).replace("T", " ")}, shown on the most recent matching
+              weekday
             </p>
           )}
           {error && <p style={{ color: "var(--mediq-red)", marginTop: 10 }}>{error}</p>}

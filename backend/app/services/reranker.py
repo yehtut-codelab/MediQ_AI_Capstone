@@ -16,7 +16,12 @@ RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 @lru_cache(maxsize=1)
 def get_reranker() -> CrossEncoder:
-    return CrossEncoder(RERANK_MODEL)
+    # Load from the local HF cache first — skips the Hub round-trip that slowed
+    # every cold start; fall back to downloading on a fresh machine.
+    try:
+        return CrossEncoder(RERANK_MODEL, local_files_only=True)
+    except OSError:
+        return CrossEncoder(RERANK_MODEL)
 
 
 def event_context_text(hit: dict) -> str:
