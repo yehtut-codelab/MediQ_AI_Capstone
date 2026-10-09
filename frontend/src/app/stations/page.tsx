@@ -20,6 +20,9 @@ type Station = {
 
 type Overview = Record<string, Station[]>;
 
+// Tab value for the combined view; not a clinic name.
+const ALL = "__all__";
+
 const BAND_COLOR = {
   green: "var(--mediq-green)",
   amber: "var(--mediq-gold)",
@@ -61,7 +64,7 @@ function HourlyBars({ hourly }: { hourly: Hourly[] }) {
 
 export default function StationsDashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [clinic, setClinic] = useState("");
+  const [clinic, setClinic] = useState(ALL);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -70,7 +73,6 @@ export default function StationsDashboard() {
         if (!res.ok) throw new Error(`API ${res.status}`);
         const data: Overview = await res.json();
         setOverview(data);
-        setClinic(Object.keys(data)[0] ?? "");
       })
       .catch((err) => setError(String(err)));
   }, []);
@@ -79,7 +81,11 @@ export default function StationsDashboard() {
   if (!overview)
     return <p className="muted">Computing station statistics from 227K events… (first load takes a few seconds)</p>;
 
-  const stationList = overview[clinic] ?? [];
+  const stationList =
+    clinic === ALL
+      ? Object.entries(overview).flatMap(([c, list]) => list.map((s) => ({ ...s, clinic: c })))
+      : (overview[clinic] ?? []).map((s) => ({ ...s, clinic }));
+  const totalStations = Object.values(overview).reduce((n, list) => n + list.length, 0);
 
   return (
     <>
@@ -87,6 +93,9 @@ export default function StationsDashboard() {
         <div className="panel-head">Station Map — Historical Wait Profile by Service</div>
         <div className="panel-body">
           <div className="clinic-tabs">
+            <button className={clinic === ALL ? "tab active" : "tab"} onClick={() => setClinic(ALL)}>
+              All stations ({totalStations})
+            </button>
             {Object.keys(overview).map((c) => (
               <button
                 key={c}
@@ -101,7 +110,7 @@ export default function StationsDashboard() {
           <div className="station-grid" aria-live="polite">
             {stationList.map((s) => (
               <div
-                key={s.service_type}
+                key={`${s.clinic}-${s.service_type}`}
                 className="station-card"
                 style={{ borderTopColor: BAND_COLOR[s.band] }}
               >
@@ -109,6 +118,9 @@ export default function StationsDashboard() {
                   {s.service_type}
                   <span className={`band-chip ${s.band}`}>{BAND_LABEL[s.band]}</span>
                 </div>
+                {clinic === ALL && (
+                  <div className="muted" style={{ fontSize: 11 }}>{s.clinic}</div>
+                )}
                 <div className="station-median" style={{ color: BAND_COLOR[s.band] }}>
                   {s.median_wait_min}
                   <span style={{ fontSize: 13, fontWeight: 400 }}> min median</span>
