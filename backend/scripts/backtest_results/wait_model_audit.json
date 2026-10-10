@@ -1,0 +1,225 @@
+{
+ "rows": {
+  "train": 332342,
+  "validation": 73258
+ },
+ "reported": {
+  "val_MAE_min": 11.344,
+  "val_RMSE_min": 18.99,
+  "val_R2": 0.513,
+  "mae_improvement_pct": 20.54,
+  "baselines": [
+   {
+    "label": "B1: Global Mean",
+    "MAE": 20.552,
+    "RMSE": 27.315,
+    "R2": -0.007
+   },
+   {
+    "label": "B2: Category Mean",
+    "MAE": 15.866,
+    "RMSE": 23.3,
+    "R2": 0.267
+   }
+  ]
+ },
+ "reproduction_by_queue_depth_definition": {
+  "clinic+category, same day, start<t<end": {
+   "MAE": 12.524,
+   "RMSE": 21.105,
+   "R2": 0.399
+  },
+  "clinic+category, same day, incl. self": {
+   "MAE": 12.377,
+   "RMSE": 20.85,
+   "R2": 0.413
+  },
+  "category (clinics pooled), start<t<end": {
+   "MAE": 11.342,
+   "RMSE": 18.991,
+   "R2": 0.513
+  },
+  "category (clinics pooled), incl. self": {
+   "MAE": 11.351,
+   "RMSE": 18.847,
+   "R2": 0.521
+  },
+  "clinic (all categories), start<t<end": {
+   "MAE": 13.754,
+   "RMSE": 20.803,
+   "R2": 0.416
+  },
+  "room, start<t<end": {
+   "MAE": 14.011,
+   "RMSE": 23.641,
+   "R2": 0.246
+  }
+ },
+ "closest_definition": "category (clinics pooled), start<t<end",
+ "reference_validation": {
+  "MAE": 11.342,
+  "RMSE": 18.991,
+  "R2": 0.513
+ },
+ "reported_baselines_reproduced": {
+  "global_mean": {
+   "MAE": 20.552,
+   "RMSE": 27.315,
+   "R2": -0.007
+  },
+  "category_mean": {
+   "MAE": 15.866,
+   "RMSE": 23.3,
+   "R2": 0.267
+  }
+ },
+ "mae_increase_when_input_shuffled": {
+  "queue_depth": 3.782,
+  "hour_of_day": 3.603,
+  "cat_encoded": 3.539,
+  "appointment_lag_clipped": 1.874,
+  "visit_length": 0.471,
+  "visit_position": 0.412,
+  "clinic_encoded": 0.157,
+  "day_of_week": 0.119,
+  "month": 0.0
+ },
+ "without_future_visit_length": {
+  "typical_length_for_station": {
+   "MAE": 11.382,
+   "RMSE": 18.845,
+   "R2": 0.521
+  },
+  "max(steps_so_far, typical_length)": {
+   "MAE": 11.38,
+   "RMSE": 18.98,
+   "R2": 0.514
+  }
+ },
+ "as_called_by_the_app": {
+  "typical position+length, lag=0, app queue depth": {
+   "MAE": 15.125,
+   "RMSE": 26.587,
+   "R2": 0.046
+  },
+  "same, but with the real appointment lag": {
+   "MAE": 12.624,
+   "RMSE": 20.941,
+   "R2": 0.408
+  }
+ },
+ "baselines_on_validation": {
+  "category median": {
+   "MAE": 14.512,
+   "RMSE": 23.593,
+   "R2": 0.249
+  },
+  "clinic+category median": {
+   "MAE": 14.508,
+   "RMSE": 23.553,
+   "R2": 0.251
+  },
+  "clinic+category+hour median": {
+   "MAE": 13.325,
+   "RMSE": 21.6,
+   "R2": 0.37
+  },
+  "clinic+category+hour+weekday median": {
+   "MAE": 13.285,
+   "RMSE": 21.527,
+   "R2": 0.375
+  },
+  "live: median of last 10 waits at the station": {
+   "MAE": 15.385,
+   "RMSE": 25.78,
+   "R2": 0.103
+  },
+  "xgboost (reference)": {
+   "MAE": 11.342,
+   "RMSE": 18.991,
+   "R2": 0.513
+  },
+  "xgboost (as called by the app)": {
+   "MAE": 15.125,
+   "RMSE": 26.587,
+   "R2": 0.046
+  }
+ },
+ "calibration": {
+  "mean_actual_min": 21.59,
+  "mean_predicted_min": 16.43,
+  "median_actual_min": 10.0,
+  "median_predicted_min": 9.11,
+  "share_within_plus_minus_MAE": 0.684,
+  "share_actual_above_predicted_plus_MAE": 0.236,
+  "band_accuracy": 0.793,
+  "band_recall": {
+   "green <30": 0.954,
+   "amber 30-60": 0.333,
+   "red >60": 0.291
+  },
+  "band_share_actual": {
+   "green <30": 0.747,
+   "amber 30-60": 0.156,
+   "red >60": 0.097
+  },
+  "band_share_predicted": {
+   "green <30": 0.832,
+   "amber 30-60": 0.133,
+   "red >60": 0.034
+  },
+  "max_prediction_min": 180.1,
+  "mae_by_actual_wait": {
+   "<30 min": 6.27,
+   "30-60 min": 18.24,
+   ">60 min": 39.4
+  }
+ },
+ "per_category": {
+  "consultation": {
+   "n": 25455,
+   "xgboost_MAE": 19.05,
+   "station_hour_median_MAE": 22.65
+  },
+  "visual_acuity": {
+   "n": 22391,
+   "xgboost_MAE": 6.39,
+   "station_hour_median_MAE": 7.35
+  },
+  "diagnostic_scan": {
+   "n": 11567,
+   "xgboost_MAE": 6.51,
+   "station_hour_median_MAE": 7.23
+  },
+  "other": {
+   "n": 4144,
+   "xgboost_MAE": 11.84,
+   "station_hour_median_MAE": 13.01
+  },
+  "visual_field_test": {
+   "n": 3562,
+   "xgboost_MAE": 7.59,
+   "station_hour_median_MAE": 10.8
+  },
+  "refraction": {
+   "n": 3309,
+   "xgboost_MAE": 8.13,
+   "station_hour_median_MAE": 8.93
+  },
+  "biometry": {
+   "n": 1977,
+   "xgboost_MAE": 9.19,
+   "station_hour_median_MAE": 11.46
+  },
+  "treatment": {
+   "n": 429,
+   "xgboost_MAE": 6.6,
+   "station_hour_median_MAE": 6.71
+  },
+  "laser_procedure": {
+   "n": 424,
+   "xgboost_MAE": 8.6,
+   "station_hour_median_MAE": 9.18
+  }
+ }
+}

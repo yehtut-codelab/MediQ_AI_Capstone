@@ -1,0 +1,419 @@
+{
+ "summary": {
+  "test_period": [
+   "2025-07-31",
+   "2025-09-30"
+  ],
+  "main_categories": [
+   "biometry",
+   "consultation",
+   "diagnostic_scan",
+   "laser_procedure",
+   "other",
+   "refraction",
+   "treatment",
+   "visual_acuity"
+  ],
+  "congestion_level_patients": {
+   "biometry": 5,
+   "consultation": 75.1,
+   "diagnostic_scan": 9.9,
+   "laser_procedure": 8.0,
+   "other": 7.3,
+   "refraction": 5,
+   "treatment": 9.6,
+   "visual_acuity": 15.7,
+   "visual_field_test": 5
+  },
+  "forecast_mae_patients": {
+   "steps_ahead": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "lstm_as_trained": [
+    1.58,
+    2.11,
+    2.47,
+    2.7
+   ],
+   "lstm_leak_free": [
+    3.33,
+    3.7,
+    3.92,
+    3.95
+   ],
+   "persistence": [
+    2.31,
+    3.83,
+    5.11,
+    6.28
+   ],
+   "historical_profile": [
+    3.23,
+    3.18,
+    3.12,
+    3.05
+   ],
+   "all_categories_overall": {
+    "lstm_as_trained": 2.186,
+    "lstm_leak_free": 3.652,
+    "persistence": 4.296,
+    "historical_profile": 3.082
+   }
+  },
+  "early_warning_decisions": {
+   "decision_points": 5436,
+   "positives": 458,
+   "base_rate": 0.084,
+   "alert_budget_for_baselines": 24,
+   "methods": {
+    "lstm_as_trained": {
+     "average_precision": 0.269,
+     "at_congestion_level": {
+      "alerts": 67,
+      "precision": 0.537,
+      "recall": 0.079
+     },
+     "at_same_alert_budget": {
+      "alerts": 24,
+      "precision": 0.333,
+      "recall": 0.017
+     }
+    },
+    "lstm_leak_free": {
+     "average_precision": 0.231,
+     "at_congestion_level": {
+      "alerts": 24,
+      "precision": 0.167,
+      "recall": 0.009
+     },
+     "at_same_alert_budget": {
+      "alerts": 24,
+      "precision": 0.167,
+      "recall": 0.009
+     }
+    },
+    "historical_profile": {
+     "average_precision": 0.247,
+     "at_same_alert_budget": {
+      "alerts": 24,
+      "precision": 0.792,
+      "recall": 0.041
+     }
+    },
+    "trend_extrapolation": {
+     "average_precision": 0.254,
+     "at_same_alert_budget": {
+      "alerts": 24,
+      "precision": 0.625,
+      "recall": 0.033
+     }
+    },
+    "persistence": {
+     "average_precision": 0.234,
+     "at_same_alert_budget": {
+      "alerts": 24,
+      "precision": 0.625,
+      "recall": 0.033
+     }
+    }
+   }
+  },
+  "congestion_onsets": {
+   "as_trained": {
+    "onsets": 276,
+    "onsets_with_2h_history": 159,
+    "warned_in_advance": 34,
+    "share_of_all_onsets": 0.123,
+    "share_of_onsets_with_history": 0.214,
+    "mean_lead_min": 13.7,
+    "median_lead_min": 0.0,
+    "warned_30min_plus_share_of_all": 0.04
+   },
+   "leak_free": {
+    "onsets": 276,
+    "onsets_with_2h_history": 159,
+    "warned_in_advance": 2,
+    "share_of_all_onsets": 0.007,
+    "share_of_onsets_with_history": 0.013,
+    "mean_lead_min": 37.5,
+    "median_lead_min": 37.5,
+    "warned_30min_plus_share_of_all": 0.007
+   }
+  }
+ },
+ "categories": [
+  {
+   "category": "consultation",
+   "events": 338043,
+   "level": 75.1,
+   "decision_points": 1064,
+   "onsets_within_horizon": 59,
+   "mae_lstm_leak_free": [
+    10.4,
+    11.77,
+    12.62,
+    12.8
+   ],
+   "mae_persistence": [
+    5.77,
+    10.67,
+    15.13,
+    19.36
+   ],
+   "mae_hist_profile": [
+    8.59,
+    8.72,
+    8.84,
+    8.93
+   ],
+   "alert_leak_free": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  },
+  {
+   "category": "visual_acuity",
+   "events": 174294,
+   "level": 15.7,
+   "decision_points": 886,
+   "onsets_within_horizon": 58,
+   "mae_lstm_leak_free": [
+    1.98,
+    2.18,
+    2.23,
+    2.16
+   ],
+   "mae_persistence": [
+    2.25,
+    3.59,
+    4.71,
+    5.68
+   ],
+   "mae_hist_profile": [
+    2.79,
+    2.56,
+    2.34,
+    2.13
+   ],
+   "alert_leak_free": {
+    "alerts": 3,
+    "precision": 1.0,
+    "recall": 0.052
+   }
+  },
+  {
+   "category": "diagnostic_scan",
+   "events": 93704,
+   "level": 9.9,
+   "decision_points": 825,
+   "onsets_within_horizon": 37,
+   "mae_lstm_leak_free": [
+    1.56,
+    1.8,
+    1.86,
+    1.84
+   ],
+   "mae_persistence": [
+    1.59,
+    2.29,
+    2.83,
+    3.29
+   ],
+   "mae_hist_profile": [
+    2.17,
+    2.07,
+    1.92,
+    1.72
+   ],
+   "alert_leak_free": {
+    "alerts": 7,
+    "precision": 0.143,
+    "recall": 0.027
+   }
+  },
+  {
+   "category": "other",
+   "events": 48582,
+   "level": 7.3,
+   "decision_points": 717,
+   "onsets_within_horizon": 122,
+   "mae_lstm_leak_free": [
+    1.99,
+    2.1,
+    2.18,
+    2.12
+   ],
+   "mae_persistence": [
+    1.41,
+    2.02,
+    2.41,
+    2.8
+   ],
+   "mae_hist_profile": [
+    1.75,
+    1.72,
+    1.67,
+    1.62
+   ],
+   "alert_leak_free": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  },
+  {
+   "category": "laser_procedure",
+   "events": 38992,
+   "level": 8.0,
+   "decision_points": 499,
+   "onsets_within_horizon": 53,
+   "mae_lstm_leak_free": [
+    1.8,
+    2.04,
+    2.28,
+    2.44
+   ],
+   "mae_persistence": [
+    1.37,
+    2.17,
+    2.76,
+    3.2
+   ],
+   "mae_hist_profile": [
+    2.18,
+    2.1,
+    2.03,
+    1.98
+   ],
+   "alert_leak_free": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  },
+  {
+   "category": "treatment",
+   "events": 36833,
+   "level": 9.6,
+   "decision_points": 574,
+   "onsets_within_horizon": 34,
+   "mae_lstm_leak_free": [
+    2.03,
+    2.05,
+    2.05,
+    2.05
+   ],
+   "mae_persistence": [
+    1.41,
+    2.0,
+    2.35,
+    2.65
+   ],
+   "mae_hist_profile": [
+    2.09,
+    1.99,
+    1.88,
+    1.79
+   ],
+   "alert_leak_free": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  },
+  {
+   "category": "refraction",
+   "events": 29109,
+   "level": 5,
+   "decision_points": 535,
+   "onsets_within_horizon": 49,
+   "mae_lstm_leak_free": [
+    1.09,
+    1.11,
+    1.15,
+    1.12
+   ],
+   "mae_persistence": [
+    0.97,
+    1.34,
+    1.61,
+    1.75
+   ],
+   "mae_hist_profile": [
+    1.09,
+    1.04,
+    1.02,
+    0.99
+   ],
+   "alert_leak_free": {
+    "alerts": 6,
+    "precision": 0.0,
+    "recall": 0.0
+   }
+  },
+  {
+   "category": "biometry",
+   "events": 19177,
+   "level": 5,
+   "decision_points": 336,
+   "onsets_within_horizon": 46,
+   "mae_lstm_leak_free": [
+    1.15,
+    1.3,
+    1.45,
+    1.59
+   ],
+   "mae_persistence": [
+    0.96,
+    1.45,
+    1.7,
+    1.92
+   ],
+   "mae_hist_profile": [
+    1.26,
+    1.3,
+    1.36,
+    1.46
+   ],
+   "alert_leak_free": {
+    "alerts": 8,
+    "precision": 0.0,
+    "recall": 0.0
+   }
+  },
+  {
+   "category": "visual_field_test",
+   "events": 11579,
+   "level": 5,
+   "decision_points": 163,
+   "onsets_within_horizon": 4,
+   "mae_lstm_leak_free": [
+    0.88,
+    0.96,
+    1.07,
+    1.24
+   ],
+   "mae_persistence": [
+    0.96,
+    1.24,
+    1.33,
+    1.34
+   ],
+   "mae_hist_profile": [
+    0.86,
+    0.8,
+    0.8,
+    0.83
+   ],
+   "alert_leak_free": {
+    "alerts": 10,
+    "precision": 0.0,
+    "recall": 0.0
+   }
+  }
+ ]
+}

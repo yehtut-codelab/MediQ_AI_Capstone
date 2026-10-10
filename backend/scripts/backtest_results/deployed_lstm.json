@@ -1,0 +1,557 @@
+{
+ "summary": {
+  "hold_out": [
+   "2025-07-31",
+   "2025-09-30"
+  ],
+  "main_stations": [
+   "Clinic 1A/consultation",
+   "Clinic 1A/other",
+   "Clinic 1A/visual_acuity",
+   "TTSH Eye Centre/consultation",
+   "TTSH Eye Centre/diagnostic_scan",
+   "TTSH Eye Centre/visual_acuity",
+   "TTSH Eye Centre/visual_field_test"
+  ],
+  "forecast_mae_patients": {
+   "horizons_min": [
+    15,
+    30,
+    45,
+    60
+   ],
+   "lstm_as_deployed": [
+    5.29,
+    5.57,
+    5.87,
+    6.1
+   ],
+   "lstm_leak_free": [
+    5.27,
+    5.52,
+    5.81,
+    6.04
+   ],
+   "persistence": [
+    1.48,
+    2.92,
+    4.06,
+    5.02
+   ],
+   "historical_profile": [
+    3.02,
+    2.99,
+    2.93,
+    2.85
+   ]
+  },
+  "early_warning_decisions": {
+   "decision_points": 10500,
+   "positives": 1095,
+   "base_rate": 0.104,
+   "alert_budget_for_baselines": 1176,
+   "methods": {
+    "lstm_as_deployed": {
+     "average_precision": 0.227,
+     "at_congestion_level": {
+      "alerts": 1183,
+      "precision": 0.264,
+      "recall": 0.285
+     },
+     "at_same_alert_budget": {
+      "alerts": 1176,
+      "precision": 0.262,
+      "recall": 0.281
+     }
+    },
+    "lstm_leak_free": {
+     "average_precision": 0.229,
+     "at_congestion_level": {
+      "alerts": 1176,
+      "precision": 0.264,
+      "recall": 0.284
+     },
+     "at_same_alert_budget": {
+      "alerts": 1176,
+      "precision": 0.264,
+      "recall": 0.284
+     }
+    },
+    "historical_profile": {
+     "average_precision": 0.362,
+     "at_same_alert_budget": {
+      "alerts": 1176,
+      "precision": 0.352,
+      "recall": 0.378
+     }
+    },
+    "trend_extrapolation": {
+     "average_precision": 0.367,
+     "at_same_alert_budget": {
+      "alerts": 1176,
+      "precision": 0.395,
+      "recall": 0.424
+     }
+    },
+    "persistence": {
+     "average_precision": 0.269,
+     "at_same_alert_budget": {
+      "alerts": 1176,
+      "precision": 0.325,
+      "recall": 0.349
+     }
+    }
+   }
+  },
+  "congestion_onsets": {
+   "as_deployed": {
+    "onsets": 349,
+    "warned_in_advance": 123,
+    "share_warned": 0.352,
+    "mean_lead_min": 43.0,
+    "median_lead_min": 52.5,
+    "share_warned_30min_plus": 0.289
+   },
+   "leak_free": {
+    "onsets": 349,
+    "warned_in_advance": 125,
+    "share_warned": 0.358,
+    "mean_lead_min": 42.2,
+    "median_lead_min": 52.5,
+    "share_warned_30min_plus": 0.289
+   }
+  }
+ },
+ "stations": [
+  {
+   "clinic": "Clinic 1A",
+   "category": "biometry",
+   "events": 8384,
+   "main": false,
+   "congestion_level": 5,
+   "decision_points": 1497,
+   "onsets_within_1h": 110,
+   "mae_lstm_deployed": [
+    2.08,
+    1.9,
+    1.77,
+    1.67
+   ],
+   "mae_lstm_leakfree": [
+    2.08,
+    1.9,
+    1.77,
+    1.67
+   ],
+   "mae_persistence": [
+    0.43,
+    0.79,
+    1.01,
+    1.17
+   ],
+   "mae_hist_profile": [
+    0.94,
+    0.91,
+    0.89,
+    0.85
+   ],
+   "alert_deployed": {
+    "alerts": 176,
+    "precision": 0.205,
+    "recall": 0.327
+   },
+   "alert_leakfree": {
+    "alerts": 179,
+    "precision": 0.218,
+    "recall": 0.355
+   }
+  },
+  {
+   "clinic": "Clinic 1A",
+   "category": "consultation",
+   "events": 85090,
+   "main": true,
+   "congestion_level": 51.0,
+   "decision_points": 1549,
+   "onsets_within_1h": 87,
+   "mae_lstm_deployed": [
+    12.55,
+    13.39,
+    14.17,
+    14.54
+   ],
+   "mae_lstm_leakfree": [
+    12.44,
+    13.21,
+    13.95,
+    14.31
+   ],
+   "mae_persistence": [
+    2.82,
+    6.81,
+    10.07,
+    12.74
+   ],
+   "mae_hist_profile": [
+    6.48,
+    6.52,
+    6.48,
+    6.37
+   ],
+   "alert_deployed": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   },
+   "alert_leakfree": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  },
+  {
+   "clinic": "Clinic 1A",
+   "category": "other",
+   "events": 19346,
+   "main": true,
+   "congestion_level": 6.0,
+   "decision_points": 1394,
+   "onsets_within_1h": 243,
+   "mae_lstm_deployed": [
+    1.69,
+    1.61,
+    1.57,
+    1.55
+   ],
+   "mae_lstm_leakfree": [
+    1.68,
+    1.61,
+    1.56,
+    1.54
+   ],
+   "mae_persistence": [
+    0.82,
+    1.3,
+    1.6,
+    1.84
+   ],
+   "mae_hist_profile": [
+    1.44,
+    1.43,
+    1.4,
+    1.37
+   ],
+   "alert_deployed": {
+    "alerts": 20,
+    "precision": 0.05,
+    "recall": 0.004
+   },
+   "alert_leakfree": {
+    "alerts": 19,
+    "precision": 0.053,
+    "recall": 0.004
+   }
+  },
+  {
+   "clinic": "Clinic 1A",
+   "category": "refraction",
+   "events": 8881,
+   "main": false,
+   "congestion_level": 5,
+   "decision_points": 1463,
+   "onsets_within_1h": 77,
+   "mae_lstm_deployed": [
+    2.09,
+    2.0,
+    1.96,
+    1.93
+   ],
+   "mae_lstm_leakfree": [
+    2.09,
+    2.0,
+    1.96,
+    1.93
+   ],
+   "mae_persistence": [
+    0.44,
+    0.68,
+    0.84,
+    0.96
+   ],
+   "mae_hist_profile": [
+    0.78,
+    0.75,
+    0.73,
+    0.7
+   ],
+   "alert_deployed": {
+    "alerts": 62,
+    "precision": 0.145,
+    "recall": 0.117
+   },
+   "alert_leakfree": {
+    "alerts": 65,
+    "precision": 0.169,
+    "recall": 0.143
+   }
+  },
+  {
+   "clinic": "Clinic 1A",
+   "category": "visual_acuity",
+   "events": 63906,
+   "main": true,
+   "congestion_level": 14.0,
+   "decision_points": 1451,
+   "onsets_within_1h": 152,
+   "mae_lstm_deployed": [
+    4.72,
+    5.14,
+    5.63,
+    6.18
+   ],
+   "mae_lstm_leakfree": [
+    4.72,
+    5.13,
+    5.62,
+    6.16
+   ],
+   "mae_persistence": [
+    1.38,
+    2.53,
+    3.36,
+    4.08
+   ],
+   "mae_hist_profile": [
+    2.45,
+    2.38,
+    2.28,
+    2.17
+   ],
+   "alert_deployed": {
+    "alerts": 462,
+    "precision": 0.238,
+    "recall": 0.724
+   },
+   "alert_leakfree": {
+    "alerts": 458,
+    "precision": 0.238,
+    "recall": 0.717
+   }
+  },
+  {
+   "clinic": "TTSH Eye Centre",
+   "category": "consultation",
+   "events": 57762,
+   "main": true,
+   "congestion_level": 32.0,
+   "decision_points": 1499,
+   "onsets_within_1h": 139,
+   "mae_lstm_deployed": [
+    7.76,
+    8.29,
+    8.81,
+    9.12
+   ],
+   "mae_lstm_leakfree": [
+    7.73,
+    8.18,
+    8.65,
+    8.95
+   ],
+   "mae_persistence": [
+    1.97,
+    4.38,
+    6.42,
+    8.09
+   ],
+   "mae_hist_profile": [
+    4.59,
+    4.58,
+    4.51,
+    4.4
+   ],
+   "alert_deployed": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   },
+   "alert_leakfree": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  },
+  {
+   "clinic": "TTSH Eye Centre",
+   "category": "diagnostic_scan",
+   "events": 60534,
+   "main": true,
+   "congestion_level": 13.0,
+   "decision_points": 1630,
+   "onsets_within_1h": 147,
+   "mae_lstm_deployed": [
+    3.38,
+    3.31,
+    3.21,
+    3.16
+   ],
+   "mae_lstm_leakfree": [
+    3.38,
+    3.31,
+    3.2,
+    3.15
+   ],
+   "mae_persistence": [
+    1.37,
+    2.21,
+    2.83,
+    3.4
+   ],
+   "mae_hist_profile": [
+    2.51,
+    2.46,
+    2.41,
+    2.32
+   ],
+   "alert_deployed": {
+    "alerts": 64,
+    "precision": 0.531,
+    "recall": 0.231
+   },
+   "alert_leakfree": {
+    "alerts": 63,
+    "precision": 0.54,
+    "recall": 0.231
+   }
+  },
+  {
+   "clinic": "TTSH Eye Centre",
+   "category": "refraction",
+   "events": 9075,
+   "main": false,
+   "congestion_level": 5,
+   "decision_points": 1462,
+   "onsets_within_1h": 60,
+   "mae_lstm_deployed": [
+    2.1,
+    1.97,
+    1.93,
+    1.9
+   ],
+   "mae_lstm_leakfree": [
+    2.1,
+    1.97,
+    1.93,
+    1.9
+   ],
+   "mae_persistence": [
+    0.47,
+    0.7,
+    0.84,
+    0.94
+   ],
+   "mae_hist_profile": [
+    0.83,
+    0.81,
+    0.78,
+    0.76
+   ],
+   "alert_deployed": {
+    "alerts": 54,
+    "precision": 0.111,
+    "recall": 0.1
+   },
+   "alert_leakfree": {
+    "alerts": 54,
+    "precision": 0.111,
+    "recall": 0.1
+   }
+  },
+  {
+   "clinic": "TTSH Eye Centre",
+   "category": "visual_acuity",
+   "events": 59832,
+   "main": true,
+   "congestion_level": 10.0,
+   "decision_points": 1534,
+   "onsets_within_1h": 174,
+   "mae_lstm_deployed": [
+    4.79,
+    5.13,
+    5.55,
+    6.01
+   ],
+   "mae_lstm_leakfree": [
+    4.79,
+    5.12,
+    5.53,
+    6.0
+   ],
+   "mae_persistence": [
+    1.26,
+    2.06,
+    2.67,
+    3.2
+   ],
+   "mae_hist_profile": [
+    2.26,
+    2.2,
+    2.12,
+    2.03
+   ],
+   "alert_deployed": {
+    "alerts": 637,
+    "precision": 0.262,
+    "recall": 0.96
+   },
+   "alert_leakfree": {
+    "alerts": 636,
+    "precision": 0.263,
+    "recall": 0.96
+   }
+  },
+  {
+   "clinic": "TTSH Eye Centre",
+   "category": "visual_field_test",
+   "events": 19428,
+   "main": true,
+   "congestion_level": 7.0,
+   "decision_points": 1443,
+   "onsets_within_1h": 153,
+   "mae_lstm_deployed": [
+    2.32,
+    2.31,
+    2.34,
+    2.36
+   ],
+   "mae_lstm_leakfree": [
+    2.32,
+    2.3,
+    2.33,
+    2.35
+   ],
+   "mae_persistence": [
+    0.76,
+    1.28,
+    1.69,
+    2.05
+   ],
+   "mae_hist_profile": [
+    1.52,
+    1.48,
+    1.43,
+    1.37
+   ],
+   "alert_deployed": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   },
+   "alert_leakfree": {
+    "alerts": 0,
+    "precision": null,
+    "recall": 0.0
+   }
+  }
+ ]
+}
