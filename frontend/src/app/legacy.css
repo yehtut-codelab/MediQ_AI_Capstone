@@ -45,8 +45,8 @@
   --space-6: 32px;
 
   /* type */
-  --font-display: var(--font-fraunces), "Noto Serif", serif;
-  --font-body: var(--font-manrope), "Noto Sans", sans-serif;
+  --font-display: var(--font-encode-sans), "Noto Sans", sans-serif;
+  --font-body: var(--font-encode-sans), "Noto Sans", sans-serif;
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -539,7 +539,7 @@ body:has(.qa-page) { height: 100vh; display: flex; flex-direction: column; overf
 .qa-msg-meta { display: flex; align-items: center; gap: 10px; min-height: 30px; }
 .qa-role { font-size: 13px; font-weight: 700; color: var(--ink); }
 .qa-time { font-size: 11px; color: var(--ink-mute); white-space: nowrap; }
-/* Manrope's regular (400) reads thin at body size; medium (500) is its comfortable reading weight. */
+/* Medium (500) is the comfortable reading weight for long answers; it is also the NHG site's most-used weight. */
 .qa-answer { color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.7; }
 /* Errors keep a box: they need to stand apart from normal answers. */
 .qa-msg.error .qa-answer {

@@ -1,12 +1,13 @@
 import "./globals.css";
 import type { ReactNode } from "react";
-import { Fraunces, Manrope } from "next/font/google";
+import { Encode_Sans } from "next/font/google";
 import NavLinks from "@/components/NavLinks";
 
-// Self-hosted and preloaded by Next.js (no render-blocking request to Google
-// at page load, no layout shift). Exposed as CSS variables used in legacy.css.
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces", axes: ["opsz"], display: "swap" });
+// Encode Sans is the typeface of nhghealth.com.sg, used here for both text and
+// display numbers. Self-hosted and preloaded by Next.js (no render-blocking
+// request to Google at page load, no layout shift). Exposed as a CSS variable
+// used in legacy.css.
+const encodeSans = Encode_Sans({ subsets: ["latin"], variable: "--font-encode-sans", display: "swap" });
 
 export const metadata = {
   title: "MediQ AI — Queue & Wait Advisor",
@@ -15,7 +16,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${fraunces.variable}`}>
+    <html lang="en" className={encodeSans.variable}>
       <body>
         <nav className="mediq-nav">
           <div>
