@@ -97,6 +97,12 @@ class RegisteredPatient(BaseModel):
     explanation: str
     registered_at: datetime
 
+    # RAG comparison shown beside the model prediction on a fresh registration
+    # (similar historical cases). Not persisted, so absent from GET /patients.
+    rag_estimate_min: float | None = None
+    rag_range_min: tuple[float, float] | None = None
+    rag_evidence_n: int | None = None
+
     # model-based queue state (XGBoost / HMM / LSTM), reconstructed from the
     # trained-model dataset. When the arrival time falls outside that
     # dataset's range, clinic state is replayed from the nearest date with

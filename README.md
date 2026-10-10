@@ -167,7 +167,7 @@ backend/
     query_similar.py      # CLI nearest-event check
   run_backend.cmd         # Windows helper to launch the API
 Models/                  # trained model artifacts (XGBoost, HMM, LSTM + metadata)
-frontend/                # Next.js dashboard — arrival simulator, registration, station map,
+frontend/                # Next.js dashboard — arrival simulator, registration, station overview,
                           # agent console, SOP Q&A chat, document management
 docs/                    # spec + ADRs
 data/raw/                # wait-time dataset (gitignored)

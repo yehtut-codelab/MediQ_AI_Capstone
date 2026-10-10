@@ -1,6 +1,6 @@
 """Per-station (service type) aggregates computed from the Qdrant index.
 
-One full payload scroll (~227K points) takes a few seconds, so results are
+One full payload scroll of the collection can take a few seconds, so results are
 cached in-process; the historical index is append-only, so staleness only
 matters after a re-ingestion — restart or wait out the TTL.
 """

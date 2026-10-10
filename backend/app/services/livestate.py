@@ -36,6 +36,10 @@ def dataset_range() -> tuple[datetime, datetime]:
     return df["waiting_start"].min().to_pydatetime(), df["waiting_start"].max().to_pydatetime()
 
 
+def dataset_size() -> int:
+    return len(_events())
+
+
 def analog_timestamp(at: datetime) -> tuple[datetime, bool]:
     """Map `at` onto an equivalent in-range timestamp when it falls outside
     dataset_range(): same weekday + time-of-day, on the nearest matching date

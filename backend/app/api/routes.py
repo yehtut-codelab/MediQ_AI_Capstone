@@ -236,10 +236,9 @@ def register_patient(req: PatientRegistration) -> RegisteredPatient:
         "medical_history": req.medical_history,
         "current_issue": req.current_issue,
     })
-    if not result.get("hits"):
-        raise HTTPException(404, "No historical evidence found — has ingestion run?")
-
-    stats = result["stats"]
+    # RAG evidence is supporting context only; the headline estimate comes
+    # from the trained model, so a service type with no evidence still registers.
+    stats = result["stats"] if result.get("hits") else None
     queue_position = registry.next_queue_position(
         req.clinic, req.service_type, local.date().isoformat()
     )
@@ -276,6 +275,31 @@ def register_patient(req: PatientRegistration) -> RegisteredPatient:
     except Exception:
         model_fields = {"model_unavailable_reason": "Model prediction failed unexpectedly."}
 
+    # Headline estimate: the XGBoost prediction, with a range of ± its
+    # validation MAE. RAG is the fallback only if the model could not run.
+    model_est = model_fields.get("model_estimate_min")
+    if model_est is not None:
+        mae = model_fields["model_mae_min"]
+        estimate = model_est
+        estimate_range = (round(max(0.0, model_est - mae), 1), round(model_est + mae, 1))
+        explanation = (
+            f"Predicted by the XGBoost wait-time model for {model_category.replace('_', ' ')} "
+            f"at {req.clinic} on {replayed_at:%A} at {replayed_at:%H:%M}, with "
+            f"{model_fields['model_queue_depth']} patient(s) already waiting: about "
+            f"{model_est:.0f} minutes (typical error ±{mae:.0f} minutes)."
+        )
+        if stats:
+            explanation += (
+                f" For comparison, the {stats['n']} most similar historical cases had a "
+                f"median wait of {stats['median']:.0f} minutes."
+            )
+    elif stats:
+        estimate = stats["median"]
+        estimate_range = (stats["p10"], stats["p90"])
+        explanation = result["explanation"]
+    else:
+        raise HTTPException(404, "No model prediction or historical evidence available.")
+
     patient = RegisteredPatient(
         patient_id=req.patient_id or random.randint(300_000_000, 399_999_999),
         display_name=req.display_name,
@@ -293,28 +317,36 @@ def register_patient(req: PatientRegistration) -> RegisteredPatient:
         pathway_label=pathway["label"],
         pathway=pathway["steps"],
         total_visit_min=pathway["total_visit_min"],
-        estimated_wait_min=stats["median"],
-        range_min=(stats["p10"], stats["p90"]),
-        status_band=band(stats["median"]),
-        explanation=result["explanation"],
+        estimated_wait_min=estimate,
+        range_min=estimate_range,
+        status_band=band(estimate),
+        explanation=explanation,
         registered_at=datetime.now(timezone.utc),
+        rag_estimate_min=stats["median"] if stats else None,
+        rag_range_min=(stats["p10"], stats["p90"]) if stats else None,
+        rag_evidence_n=stats["n"] if stats else None,
         **model_fields,
     )
     registry.add(patient)
     return patient
 
 
+def _today_start() -> datetime:
+    """Start of the server-local day — the cut-off for "registered today"."""
+    return datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 @router.get("/patients", response_model=list[RegisteredPatient])
 def list_patients() -> list[RegisteredPatient]:
-    return registry.list_all()
+    """Patients registered today (server-local day), newest first."""
+    return registry.list_all(since=_today_start())
 
 
 @router.get("/stations/overview")
 def stations_overview() -> dict:
     """Per-station historical stats + today's registered counts, grouped by clinic."""
     overview = stations.station_overview(get_client())
-    today = datetime.now(timezone.utc).astimezone().date().isoformat()
-    counts = registry.today_counts(today)
+    counts = registry.counts_since(_today_start())
     return {
         clinic: [
             {**s, "registered_today": counts.get((clinic, s["service_type"]), 0)}
@@ -350,6 +382,28 @@ def agent_analyze(req: AgentAnalyzeRequest) -> dict:
     report["is_analog_replay"] = is_analog
     report["replay_note"] = _replay_note(requested, replayed_at) if is_analog else None
     return report
+
+
+@router.get("/models/wait-time")
+def wait_time_model_card() -> dict:
+    """Model card for the XGBoost wait-time regressor: validation metrics,
+    baselines it was compared against, features, and the data it learned from."""
+    meta = models_service.wait_meta()
+    lo, hi = livestate.dataset_range()
+    return {
+        "name": "XGBoost wait-time regressor",
+        "algorithm": "Gradient-boosted decision trees (XGBoost)",
+        "target": meta["target"],
+        "target_transform": meta["target_transform"],
+        "features": meta["features"],
+        "boosting_rounds": meta["best_iteration"] + 1,
+        "train_cutoff": meta["train_cutoff"],
+        "dataset_min": lo.isoformat(),
+        "dataset_max": hi.isoformat(),
+        "dataset_events": livestate.dataset_size(),
+        "evaluation": meta["evaluation"],
+        "baselines": meta["baselines"],
+    }
 
 
 @router.get("/agent/dataset-range")

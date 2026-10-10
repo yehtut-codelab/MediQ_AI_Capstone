@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import SuggestField from "@/components/SuggestField";
-import { BAND_LABEL, bandFor } from "@/lib/band";
+import { BAND_LABEL } from "@/lib/band";
 import { CURRENT_ISSUE_OPTIONS, DIAGNOSIS_OPTIONS, HISTORY_OPTIONS } from "@/lib/clinicalOptions";
+import { nowLocal } from "@/lib/datetime";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -41,6 +42,10 @@ type RegisteredPatient = {
   range_min: [number, number];
   status_band: "green" | "amber" | "red";
   explanation: string;
+  registered_at: string;
+  rag_estimate_min?: number | null;
+  rag_range_min?: [number, number] | null;
+  rag_evidence_n?: number | null;
   model_category: string | null;
   model_estimate_min: number | null;
   model_mae_min: number | null;
@@ -53,6 +58,123 @@ type RegisteredPatient = {
   model_is_analog_replay: boolean;
   model_replay_note: string | null;
   model_unavailable_reason: string | null;
+};
+
+type ModelCard = {
+  name: string;
+  algorithm: string;
+  target_transform: string;
+  features: string[];
+  boosting_rounds: number;
+  train_cutoff: string;
+  dataset_min: string;
+  dataset_max: string;
+  dataset_events: number;
+  evaluation: { val_MAE_min: number; val_RMSE_min: number; val_R2: number };
+  baselines: { label: string; MAE: number; RMSE: number; R2: number }[];
+};
+
+const FEATURE_LABEL: Record<string, string> = {
+  cat_encoded: "Service category",
+  clinic_encoded: "Clinic",
+  hour_of_day: "Hour of day",
+  day_of_week: "Day of week",
+  month: "Month",
+  visit_position: "Step in the visit",
+  visit_length: "Steps in the visit",
+  appointment_lag_clipped: "Early / late vs appointment",
+  queue_depth: "Patients already waiting",
+};
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+
+// Validation error of the model against the simple baselines it was compared
+// with: one bar per predictor, shorter is better.
+function ModelStats({ card }: { card: ModelCard }) {
+  const ev = card.evaluation;
+  const rows = [
+    ...card.baselines.map((b) => ({ label: b.label.replace(/^B\d+:\s*/, "") + " (baseline)", mae: b.MAE, model: false })),
+    { label: "XGBoost model", mae: ev.val_MAE_min, model: true },
+  ];
+  const max = Math.max(...rows.map((r) => r.mae));
+  const best = Math.min(...card.baselines.map((b) => b.MAE));
+  const gain = Math.round(((best - ev.val_MAE_min) / best) * 100);
+  return (
+    <>
+      <p className="muted" style={{ marginTop: 0, marginBottom: 14, fontSize: 13 }}>
+        Every wait on this page is predicted by a machine-learning model ({card.algorithm}) trained on{" "}
+        <strong>{card.dataset_events.toLocaleString()}</strong> historical visit events from{" "}
+        {fmtDate(card.dataset_min)} to {fmtDate(card.dataset_max)}.
+      </p>
+      <div style={{ display: "flex", gap: 36, flexWrap: "wrap", marginBottom: 18 }}>
+        <div>
+          <div className="muted">Typical error (validation MAE)</div>
+          <div className="kpi-primary" style={{ color: "var(--mediq-blue)" }}>
+            ±{ev.val_MAE_min.toFixed(1)}
+            <span style={{ fontSize: 18 }}> min</span>
+          </div>
+        </div>
+        <div>
+          <div className="muted">RMSE</div>
+          <div className="kpi-secondary">{ev.val_RMSE_min.toFixed(1)} min</div>
+        </div>
+        <div>
+          <div className="muted">R² (variation explained)</div>
+          <div className="kpi-secondary">{ev.val_R2.toFixed(2)}</div>
+        </div>
+        <div>
+          <div className="muted">vs best baseline</div>
+          <div className="kpi-secondary" style={{ color: "var(--mediq-green)" }}>{gain}% lower error</div>
+        </div>
+      </div>
+
+      <div className="muted" style={{ marginBottom: 6 }}>Mean absolute error on validation data — lower is better</div>
+      <div style={{ display: "grid", gap: 6, maxWidth: 560, marginBottom: 16 }}>
+        {rows.map((r) => (
+          <div key={r.label} style={{ display: "grid", gridTemplateColumns: "170px 1fr 70px", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 12.5, fontWeight: r.model ? 700 : 500 }}>{r.label}</span>
+            <div style={{ background: "var(--border-soft)", borderRadius: 4, height: 14 }}>
+              <div
+                style={{
+                  width: `${(r.mae / max) * 100}%`,
+                  height: "100%",
+                  borderRadius: 4,
+                  background: r.model ? "var(--mediq-blue)" : "#9aa3ad",
+                }}
+              />
+            </div>
+            <span style={{ fontSize: 12.5, fontWeight: r.model ? 700 : 500 }}>{r.mae.toFixed(1)} min</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="muted" style={{ marginBottom: 6 }}>Inputs the model uses</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {card.features.map((f) => (
+          <span key={f} className="station-reg" style={{ marginTop: 0, fontSize: 11, padding: "3px 9px" }}>
+            {FEATURE_LABEL[f] ?? f}
+          </span>
+        ))}
+      </div>
+      <p className="muted">
+        {card.boosting_rounds} boosting rounds · predicts log-transformed waiting time · train cutoff{" "}
+        {fmtDate(card.train_cutoff)}
+      </p>
+    </>
+  );
+}
+
+// A registration has no id in the API; patient id + registration instant
+// identifies one row (the same patient can be registered more than once).
+const rowKey = (p: RegisteredPatient) => `${p.patient_id}|${Date.parse(p.registered_at)}`;
+
+const NEW_ROW_ID = "new-patient-row";
+
+const ordinal = (n: number) => {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
 };
 
 const PRIORITY_COLOR: Record<number, string> = {
@@ -93,12 +215,6 @@ function PriorityBadge({ p, label }: { p: number; label: string }) {
   );
 }
 
-function nowLocal(): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-
 export default function RegisterPatient() {
   const [name, setName] = useState("");
   const [patientId, setPatientId] = useState("");
@@ -111,6 +227,8 @@ export default function RegisterPatient() {
   const [currentIssue, setCurrentIssue] = useState("");
   const [registered, setRegistered] = useState<RegisteredPatient | null>(null);
   const [queue, setQueue] = useState<RegisteredPatient[]>([]);
+  const [modelCard, setModelCard] = useState<ModelCard | null>(null);
+  const [modelOpen, setModelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -125,6 +243,10 @@ export default function RegisterPatient() {
 
   useEffect(() => {
     refreshQueue();
+    fetch(`${API}/api/v1/models/wait-time`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setModelCard)
+      .catch(() => {});
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -163,6 +285,12 @@ export default function RegisterPatient() {
       setLoading(false);
     }
   }
+
+  const triageOrder = [...queue].sort(
+    (a, b) => a.priority - b.priority || a.arrival_datetime.localeCompare(b.arrival_datetime)
+  );
+  const newKey = registered ? rowKey(registered) : null;
+  const newIndex = newKey ? triageOrder.findIndex((p) => rowKey(p) === newKey) : -1;
 
   return (
     <>
@@ -267,7 +395,9 @@ export default function RegisterPatient() {
                   <div className="estimate-value">Q{registered.queue_position}</div>
                 </div>
                 <div>
-                  <div className="muted">Estimated wait</div>
+                  <div className="muted">
+                    {registered.model_estimate_min != null ? "Predicted wait — XGBoost model" : "Estimated wait"}
+                  </div>
                   <div className={`estimate-value band-${registered.status_band}`}>
                     {Math.round(registered.estimated_wait_min)}
                     <span style={{ fontSize: 18 }}> min</span>
@@ -280,21 +410,153 @@ export default function RegisterPatient() {
                 Patient #{registered.patient_id} · {registered.service_type} ·{" "}
                 {registered.clinic} · range {registered.range_min[0]}–{registered.range_min[1]} min
               </div>
+              {registered.model_estimate_min != null && (
+                <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      background: "var(--mediq-blue)", color: "#fff", borderRadius: 4,
+                      padding: "2px 8px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                    }}
+                  >
+                    ML model · XGBoost
+                  </span>
+                  <span style={{ fontSize: 13 }}>
+                    typical error ±{registered.model_mae_min?.toFixed(1)} min
+                    {modelCard &&
+                      ` · R² ${modelCard.evaluation.val_R2.toFixed(2)} · trained on ${modelCard.dataset_events.toLocaleString()} historical events`}
+                  </span>
+                </div>
+              )}
+              {registered.rag_estimate_min != null && registered.rag_range_min && (
+                <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
+                  For comparison — {registered.rag_evidence_n} most similar historical cases: median{" "}
+                  {Math.round(registered.rag_estimate_min)} min (range {Math.round(registered.rag_range_min[0])}–
+                  {Math.round(registered.rag_range_min[1])} min)
+                </div>
+              )}
               <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <PriorityBadge p={registered.priority} label={registered.priority_label} />
                 <span className="muted" style={{ fontSize: 13 }}>
                   {registered.triage_reasons.join(" · ")}
                 </span>
               </div>
+              {newIndex >= 0 && (
+                <div style={{ marginTop: 8, fontSize: 13 }}>
+                  <strong>{ordinal(newIndex + 1)} of {triageOrder.length}</strong> in today&apos;s triage order ·{" "}
+                  <a
+                    href={`#${NEW_ROW_ID}`}
+                    style={{ color: "var(--mediq-blue)", fontWeight: 600 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById(NEW_ROW_ID)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                  >
+                    Show in list ↓
+                  </a>
+                </div>
+              )}
               <p style={{ marginTop: 8 }}>{registered.explanation}</p>
             </div>
           </div>
         </div>
       )}
 
+      {queue.length > 0 && (
+        <div className="panel">
+          <div className="panel-head">
+            Registered Today ({queue.length}) — triage order
+          </div>
+          <div className="panel-body">
+            <table className="evidence-table">
+              <thead>
+                <tr>
+                  <th>Priority</th>
+                  <th>Q#</th>
+                  <th>Patient</th>
+                  <th>Clinic</th>
+                  <th>Service</th>
+                  <th>Pathway</th>
+                  <th>Arrival</th>
+                  <th>Est. wait</th>
+                </tr>
+              </thead>
+              <tbody>
+                {triageOrder.map((p, i) => {
+                  const isNew = i === newIndex;
+                  return (
+                    <tr
+                      key={rowKey(p)}
+                      id={isNew ? NEW_ROW_ID : undefined}
+                      aria-current={isNew ? "true" : undefined}
+                      style={
+                        isNew
+                          ? { background: "var(--mediq-blue-l)", boxShadow: "inset 4px 0 0 var(--mediq-blue)" }
+                          : undefined
+                      }
+                    >
+                      <td>
+                        <PriorityBadge p={p.priority} label={`P${p.priority}`} />
+                      </td>
+                      <td>Q{p.queue_position}</td>
+                      <td style={isNew ? { fontWeight: 700 } : undefined}>
+                        {p.display_name || `#${p.patient_id}`}
+                        {isNew && (
+                          <span
+                            style={{
+                              marginLeft: 8, background: "var(--mediq-blue)", color: "#fff", borderRadius: 4,
+                              padding: "1px 7px", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.3px",
+                            }}
+                          >
+                            NEW
+                          </span>
+                        )}
+                      </td>
+                      <td>{p.clinic}</td>
+                      <td>{p.service_type}</td>
+                      <td className="muted" style={{ fontSize: 13 }}>
+                        {p.pathway.map((s) => s.station).join(" → ") || "—"}
+                      </td>
+                      <td>{p.arrival_datetime.slice(11, 16)}</td>
+                      <td className={`band-${p.status_band}`} style={{ fontWeight: 600 }}>
+                        {Math.round(p.estimated_wait_min)} min
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {modelCard && (
+        <div className="panel">
+          <button
+            type="button"
+            className="panel-head"
+            aria-expanded={modelOpen}
+            aria-controls="model-card-body"
+            onClick={() => setModelOpen((o) => !o)}
+            style={{
+              width: "100%", border: "none", cursor: "pointer", textAlign: "left",
+              display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+            }}
+          >
+            <span>
+              Prediction Model — {modelCard.name} · typical error ±{modelCard.evaluation.val_MAE_min.toFixed(1)} min
+            </span>
+            <span aria-hidden="true">{modelOpen ? "▾ Hide" : "▸ Show"}</span>
+          </button>
+          {modelOpen && (
+            <div className="panel-body" id="model-card-body">
+              <ModelStats card={modelCard} />
+            </div>
+          )}
+        </div>
+      )}
+
       {registered && (
         <div className="panel">
-          <div className="panel-head">Model-Based Queue State — XGBoost · HMM · LSTM</div>
+          <div className="panel-head">Queue State at Arrival — HMM · LSTM</div>
           <div className="panel-body" aria-live="polite">
             {registered.model_unavailable_reason && (
               <p className="muted">{registered.model_unavailable_reason}</p>
@@ -307,19 +569,6 @@ export default function RegisterPatient() {
                   </p>
                 )}
                 <div style={{ display: "flex", gap: 40, marginBottom: 12, flexWrap: "wrap" }}>
-                  <div>
-                    <div className="muted">Model wait estimate ({registered.model_category?.replace(/_/g, " ")})</div>
-                    <div className={`estimate-value band-${bandFor(registered.model_estimate_min)}`}>
-                      {Math.round(registered.model_estimate_min)}
-                      <span style={{ fontSize: 18 }}> min</span>
-                      <span className={`band-chip ${bandFor(registered.model_estimate_min)}`}>
-                        {BAND_LABEL[bandFor(registered.model_estimate_min)]}
-                      </span>
-                    </div>
-                    <div className="muted" style={{ fontSize: 11 }}>
-                      XGBoost · val MAE {registered.model_mae_min} min
-                    </div>
-                  </div>
                   <div>
                     <div className="muted">Queue depth now</div>
                     <div className="kpi-secondary">{registered.model_queue_depth} waiting</div>
@@ -422,55 +671,6 @@ export default function RegisterPatient() {
         </div>
       )}
 
-      {queue.length > 0 && (
-        <div className="panel">
-          <div className="panel-head">
-            Registered Today ({queue.length}) — triage order
-          </div>
-          <div className="panel-body">
-            <table className="evidence-table">
-              <thead>
-                <tr>
-                  <th>Priority</th>
-                  <th>Q#</th>
-                  <th>Patient</th>
-                  <th>Clinic</th>
-                  <th>Service</th>
-                  <th>Pathway</th>
-                  <th>Arrival</th>
-                  <th>Est. wait</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...queue]
-                  .sort(
-                    (a, b) =>
-                      a.priority - b.priority ||
-                      a.arrival_datetime.localeCompare(b.arrival_datetime)
-                  )
-                  .map((p, i) => (
-                    <tr key={i}>
-                      <td>
-                        <PriorityBadge p={p.priority} label={`P${p.priority}`} />
-                      </td>
-                      <td>Q{p.queue_position}</td>
-                      <td>{p.display_name || `#${p.patient_id}`}</td>
-                      <td>{p.clinic}</td>
-                      <td>{p.service_type}</td>
-                      <td className="muted" style={{ fontSize: 13 }}>
-                        {p.pathway.map((s) => s.station).join(" → ") || "—"}
-                      </td>
-                      <td>{p.arrival_datetime.slice(11, 16)}</td>
-                      <td className={`band-${p.status_band}`} style={{ fontWeight: 600 }}>
-                        {Math.round(p.estimated_wait_min)} min
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </>
   );
 }

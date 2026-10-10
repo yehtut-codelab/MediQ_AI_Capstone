@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/", label: "Arrival Simulator" },
   { href: "/register", label: "New Patient Entry" },
-  { href: "/stations", label: "Station Map" },
+  { href: "/stations", label: "Station Overview" },
   { href: "/agent", label: "AI Agent Console" },
   { href: "/qa", label: "SOP Q&A" },
   { href: "/documents", label: "Knowledge Base" },

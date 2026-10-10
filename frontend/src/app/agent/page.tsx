@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BAND_LABEL, bandFor } from "@/lib/band";
+import { nowLocal } from "@/lib/datetime";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -64,7 +65,7 @@ export default function AgentConsole() {
   const [range, setRange] = useState<{ min: string; max: string; categories: string[] } | null>(null);
   const [clinic, setClinic] = useState("TTSH Eye Centre");
   const [category, setCategory] = useState("consultation");
-  const [asOf, setAsOf] = useState("2025-03-12T10:30");
+  const [asOf, setAsOf] = useState(nowLocal);
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

@@ -5,7 +5,7 @@ Stdlib sqlite3; one connection per call is plenty at clinic-registration rates.
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.schemas import RegisteredPatient
@@ -145,23 +145,32 @@ def add(patient: RegisteredPatient) -> None:
         )
 
 
-def today_counts(arrival_date: str) -> dict[tuple[str, str], int]:
-    """{(clinic, service_type): registrations on the given date}."""
+def counts_since(since: datetime) -> dict[tuple[str, str], int]:
+    """{(clinic, service_type): registrations made at or after `since`}.
+    Same "registered today" definition as list_all(since=...)."""
     with _connect() as conn:
         rows = conn.execute(
             "SELECT clinic, service_type, COUNT(*) AS n FROM registrations "
-            "WHERE date(arrival_datetime) = ? GROUP BY clinic, service_type",
-            (arrival_date,),
+            "WHERE registered_at >= ? GROUP BY clinic, service_type",
+            (since.astimezone(timezone.utc).isoformat(),),
         ).fetchall()
     return {(r["clinic"], r["service_type"]): r["n"] for r in rows}
 
 
-def list_all(limit: int = 200) -> list[RegisteredPatient]:
-    """Newest first."""
+def list_all(limit: int = 200, since: datetime | None = None) -> list[RegisteredPatient]:
+    """Newest first. `since` (timezone-aware) keeps only rows registered at or
+    after that instant; registered_at is stored as a UTC ISO string, so the
+    comparison is done on UTC text."""
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM registrations ORDER BY id DESC LIMIT ?", (limit,)
-        ).fetchall()
+        if since is None:
+            rows = conn.execute(
+                "SELECT * FROM registrations ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM registrations WHERE registered_at >= ? ORDER BY id DESC LIMIT ?",
+                (since.astimezone(timezone.utc).isoformat(), limit),
+            ).fetchall()
     return [
         RegisteredPatient(
             patient_id=r["patient_id"],

@@ -79,18 +79,19 @@ export default function StationsDashboard() {
 
   if (error) return <p style={{ color: "var(--mediq-red)" }}>{error}</p>;
   if (!overview)
-    return <p className="muted">Computing station statistics from 227K events… (first load takes a few seconds)</p>;
+    return <p className="muted">Computing station statistics from historical wait events… (first load takes a few seconds)</p>;
 
   const stationList =
     clinic === ALL
       ? Object.entries(overview).flatMap(([c, list]) => list.map((s) => ({ ...s, clinic: c })))
       : (overview[clinic] ?? []).map((s) => ({ ...s, clinic }));
   const totalStations = Object.values(overview).reduce((n, list) => n + list.length, 0);
+  const totalEvents = Object.values(overview).flat().reduce((n, st) => n + st.count, 0);
 
   return (
     <>
       <div className="panel">
-        <div className="panel-head">Station Map — Historical Wait Profile by Service</div>
+        <div className="panel-head">Station Overview — Historical Wait Profile by Service</div>
         <div className="panel-body">
           <div className="clinic-tabs">
             <button className={clinic === ALL ? "tab active" : "tab"} onClick={() => setClinic(ALL)}>
@@ -141,8 +142,9 @@ export default function StationsDashboard() {
       </div>
 
       <p className="muted" style={{ marginTop: -6 }}>
-        Bars show median wait by hour of day (07:00–18:00). Colors follow clinic thresholds:
-        green &lt;30 min, amber 30–60 min, red &gt;60 min.
+        Based on {totalEvents.toLocaleString()} historical wait events across {totalStations} stations;
+        stations with fewer than 200 events are not shown. Bars show median wait by hour of day
+        (07:00–18:00). Colors follow clinic thresholds: green &lt;30 min, amber 30–60 min, red &gt;60 min.
       </p>
     </>
   );
