@@ -1,0 +1,298 @@
+{
+ "generated_by": "backend/scripts/audit_lgbm_global.py",
+ "train": {
+  "events": 649488,
+  "from": "2023-10-02",
+  "to": "2025-05-30"
+ },
+ "test": {
+  "events": 73369,
+  "from": "2025-07-31",
+  "to": "2025-09-30"
+ },
+ "defaults": {
+  "by_category": {
+   "biometry": {
+    "room_number_encoded": 18.853,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -12.0
+   },
+   "consultation": {
+    "room_number_encoded": 45.104,
+    "room_queue_depth": 2.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -17.0
+   },
+   "diagnostic_scan": {
+    "room_number_encoded": 10.005,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -14.0
+   },
+   "laser_procedure": {
+    "room_number_encoded": 15.322,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -15.0
+   },
+   "other": {
+    "room_number_encoded": 10.139,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -13.0
+   },
+   "refraction": {
+    "room_number_encoded": 10.544,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -11.0
+   },
+   "treatment": {
+    "room_number_encoded": 11.731,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -11.0
+   },
+   "visual_acuity": {
+    "room_number_encoded": 9.434,
+    "room_queue_depth": 2.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -11.0
+   },
+   "visual_field_test": {
+    "room_number_encoded": 18.729,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -11.0
+   }
+  },
+  "Clinic 1A": {
+   "biometry": {
+    "room_number_encoded": 18.853,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -12.0
+   },
+   "consultation": {
+    "room_number_encoded": 48.11,
+    "room_queue_depth": 2.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -19.0
+   },
+   "diagnostic_scan": {
+    "room_number_encoded": 6.937,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 2.0,
+    "appointment_lag_clipped": -9.0
+   },
+   "other": {
+    "room_number_encoded": 10.139,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -11.0
+   },
+   "refraction": {
+    "room_number_encoded": 10.073,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 2.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -14.0
+   },
+   "treatment": {
+    "room_number_encoded": 11.731,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -8.0
+   },
+   "visual_acuity": {
+    "room_number_encoded": 9.916,
+    "room_queue_depth": 2.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -12.0
+   }
+  },
+  "TTSH Eye Centre": {
+   "biometry": {
+    "room_number_encoded": 41.945,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 2.0,
+    "appointment_lag_clipped": -16.0
+   },
+   "consultation": {
+    "room_number_encoded": 22.2,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -14.0
+   },
+   "diagnostic_scan": {
+    "room_number_encoded": 10.005,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -14.0
+   },
+   "laser_procedure": {
+    "room_number_encoded": 15.322,
+    "room_queue_depth": 1.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -15.0
+   },
+   "other": {
+    "room_number_encoded": 12.238,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -14.0
+   },
+   "refraction": {
+    "room_number_encoded": 11.486,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -10.0
+   },
+   "treatment": {
+    "room_number_encoded": 34.442,
+    "room_queue_depth": 3.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 2.0,
+    "appointment_lag_clipped": -13.0
+   },
+   "visual_acuity": {
+    "room_number_encoded": 8.826,
+    "room_queue_depth": 2.0,
+    "prior_visit_count": 1.0,
+    "visit_position": 0.0,
+    "appointment_lag_clipped": -10.0
+   },
+   "visual_field_test": {
+    "room_number_encoded": 18.729,
+    "room_queue_depth": 0.0,
+    "prior_visit_count": 0.0,
+    "visit_position": 1.0,
+    "appointment_lag_clipped": -11.0
+   }
+  }
+ },
+ "evaluation": {
+  "as_trained": {
+   "MAE": 11.4,
+   "RMSE": 19.04,
+   "R2": 0.508
+  },
+  "app": {
+   "MAE": 14.78,
+   "RMSE": 24.04,
+   "R2": 0.216
+  },
+  "app_no_appointment": {
+   "MAE": 15.6,
+   "RMSE": 25.44,
+   "R2": 0.122
+  }
+ },
+ "range": {
+  "share_below_p10": 0.156,
+  "share_within_p10_p90": 0.653,
+  "share_above_p90": 0.191,
+  "median_width_min": 26.3,
+  "p50_MAE": 14.89
+ },
+ "breach": {
+  "breach_rate": 0.207,
+  "AUC": 0.756,
+  "F1": 0.46,
+  "share_flagged": 0.338,
+  "precision": 0.371,
+  "recall": 0.607
+ },
+ "baselines": [
+  {
+   "label": "Station median",
+   "MAE": 15.88,
+   "RMSE": 25.4,
+   "R2": 0.124
+  },
+  {
+   "label": "Station, weekday and hour median",
+   "MAE": 15.65,
+   "RMSE": 25.08,
+   "R2": 0.146
+  }
+ ],
+ "per_category": {
+  "visual_acuity": {
+   "n": 15945,
+   "as_trained_MAE": 6.33,
+   "app_conditions_MAE": 7.42,
+   "weekday_hour_median_MAE": 7.69
+  },
+  "consultation": {
+   "n": 30938,
+   "as_trained_MAE": 16.51,
+   "app_conditions_MAE": 22.67,
+   "weekday_hour_median_MAE": 24.21
+  },
+  "diagnostic_scan": {
+   "n": 8570,
+   "as_trained_MAE": 5.85,
+   "app_conditions_MAE": 6.2,
+   "weekday_hour_median_MAE": 6.54
+  },
+  "biometry": {
+   "n": 1680,
+   "as_trained_MAE": 9.29,
+   "app_conditions_MAE": 10.35,
+   "weekday_hour_median_MAE": 12.06
+  },
+  "visual_field_test": {
+   "n": 1030,
+   "as_trained_MAE": 9.33,
+   "app_conditions_MAE": 11.45,
+   "weekday_hour_median_MAE": 11.03
+  },
+  "refraction": {
+   "n": 2741,
+   "as_trained_MAE": 8.38,
+   "app_conditions_MAE": 8.85,
+   "weekday_hour_median_MAE": 9.18
+  },
+  "laser_procedure": {
+   "n": 3792,
+   "as_trained_MAE": 8.93,
+   "app_conditions_MAE": 11.28,
+   "weekday_hour_median_MAE": 12.29
+  },
+  "treatment": {
+   "n": 3585,
+   "as_trained_MAE": 11.51,
+   "app_conditions_MAE": 13.7,
+   "weekday_hour_median_MAE": 14.24
+  },
+  "other": {
+   "n": 5088,
+   "as_trained_MAE": 10.02,
+   "app_conditions_MAE": 13.03,
+   "weekday_hour_median_MAE": 13.0
+  }
+ }
+}

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import SuggestField from "@/components/SuggestField";
 import { BAND_LABEL } from "@/lib/band";
 import { CURRENT_ISSUE_OPTIONS, DIAGNOSIS_OPTIONS, HISTORY_OPTIONS } from "@/lib/clinicalOptions";
-import { nowLocal, upcomingAt } from "@/lib/datetime";
+import { nowLocal, upcomingAt, todayAt } from "@/lib/datetime";
+import { GoldenSamples, appointmentLagMin, type GoldenSample } from "@/components/GoldenSamples";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -20,6 +21,9 @@ type QueueSimulation = {
   queue_depth: number;
   model_estimate_min: number;
   model_mae_min: number;
+  model_range_min: [number, number];
+  breach_limit_min: number;
+  breach_flag: boolean;
   status_band: "green" | "amber" | "red";
   congestion_state: "Low" | "Medium" | "High" | "unknown";
   congestion_mean_wait_min: number | null;
@@ -96,6 +100,8 @@ export default function ArrivalSimulator() {
   const [history, setHistory] = useState("");
   const [currentIssue, setCurrentIssue] = useState("");
   const [sample, setSample] = useState<SamplePatient | null>(null);
+  // A picked golden sample pins the clinic state; editing clinic, category or arrival unpins it.
+  const [golden, setGolden] = useState<GoldenSample | null>(null);
   const [sampling, setSampling] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -115,7 +121,24 @@ export default function ArrivalSimulator() {
       .catch(() => {});
   }, []);
 
+  function pickGolden(s: GoldenSample) {
+    setClinic(s.clinic);
+    setCategory(s.category);
+    setArrival(todayAt(s.arrival_time));
+    setDiagnosis(s.diagnosis);
+    setHistory(s.medical_history);
+    setCurrentIssue(s.current_issue);
+    setGolden(s);
+    setSample(null);
+    setResult(null);
+    setSimResult(null);
+    setRagUnavailable(null);
+    setError("");
+    setSimError("");
+  }
+
   async function loadSample() {
+    setGolden(null);
     setSampling(true);
     setError("");
     try {
@@ -155,6 +178,7 @@ export default function ArrivalSimulator() {
           clinic,
           service_type: serviceType,
           arrival_datetime: arrivalIso,
+          replay_at: golden?.replay_at ?? null,
           diagnosis: diagnosis || null,
           medical_history: history || null,
           current_issue: currentIssue || null,
@@ -173,7 +197,13 @@ export default function ArrivalSimulator() {
       const res = await fetch(`${API}/api/v1/queue/simulate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clinic, category, as_of: `${arrival}:00` }),
+        body: JSON.stringify({
+          clinic,
+          category,
+          as_of: `${arrival}:00`,
+          replay_at: golden?.replay_at ?? null,
+          appointment_lag_min: golden ? appointmentLagMin(golden) : null,
+        }),
       });
       if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
       setSimResult(await res.json());
@@ -204,11 +234,12 @@ export default function ArrivalSimulator() {
         <div className="panel-body">
           <p className="muted" style={{ marginTop: 0, marginBottom: 12 }}>
             One patient scenario drives two independent estimates below: a RAG search over similar
-            historical cases, and a queue simulation from the trained XGBoost / HMM / LSTM models.
+            historical cases, and a queue simulation from the trained LightGBM / HMM / LSTM models.
             The RAG estimate is unavailable for a few categories the evidence corpus doesn't cover.
             The queue simulator can use any date — for one outside its trained dataset, it replays
             the nearest historical date with the same weekday and time instead.
           </p>
+          <GoldenSamples selected={golden} onPick={pickGolden} />
           <form className="form-grid" onSubmit={run}>
             <div>
               <label>Clinic</label>
@@ -217,6 +248,7 @@ export default function ArrivalSimulator() {
                 onChange={(e) => {
                   setClinic(e.target.value);
                   setSample(null);
+                  setGolden(null);
                 }}
               >
                 <option>TTSH Eye Centre</option>
@@ -233,6 +265,7 @@ export default function ArrivalSimulator() {
                 onChange={(e) => {
                   setCategory(e.target.value);
                   setSample(null);
+                  setGolden(null);
                 }}
               >
                 {(range?.categories ?? [category]).map((c) => (
@@ -250,6 +283,7 @@ export default function ArrivalSimulator() {
                 onChange={(e) => {
                   setArrival(e.target.value);
                   setSample(null);
+                  setGolden(null);
                 }}
               />
             </div>
@@ -292,6 +326,12 @@ export default function ArrivalSimulator() {
               {sampling ? "Loading sample…" : "Load Sample Patient"}
             </button>
           </form>
+          {golden && (
+            <p className="muted" style={{ marginTop: 10 }}>
+              Golden sample: {golden.display_name} · appointment {golden.appointment_time} · clinic state
+              replayed from {new Date(golden.replay_at).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}.
+            </p>
+          )}
           {sample && (
             <p className="muted" style={{ marginTop: 10 }}>
               Sample patient #{sample.patient_id} · historical station {sample.service_point} ·
@@ -364,7 +404,7 @@ export default function ArrivalSimulator() {
       </div>
 
       <div className="panel">
-        <div className="panel-head">Simulated Queue State — XGBoost · HMM · LSTM</div>
+        <div className="panel-head">Simulated Queue State — LightGBM · HMM · LSTM</div>
         <div className="panel-body" aria-live="polite">
           {simError && <p style={{ color: "var(--mediq-red)" }}>{simError}</p>}
           {!simError && !simResult && !loading && (
@@ -386,8 +426,14 @@ export default function ArrivalSimulator() {
                     <span className={`band-chip ${simResult.status_band}`}>{BAND_LABEL[simResult.status_band]}</span>
                   </div>
                   <div className="muted" style={{ fontSize: 11 }}>
-                    XGBoost · val MAE {simResult.model_mae_min} min
+                    LightGBM · likely range {Math.round(simResult.model_range_min[0])}–
+                    {Math.round(simResult.model_range_min[1])} min · typical error ±{simResult.model_mae_min.toFixed(1)} min
                   </div>
+                  {simResult.breach_flag && (
+                    <div style={{ fontSize: 11, color: "var(--mediq-red)", fontWeight: 600 }}>
+                      ⚠ May wait past the {simResult.breach_limit_min}-minute limit
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="muted">Queue depth now</div>

@@ -21,13 +21,13 @@ rewords the final text.
 | # | Agent / module | Uses | Output |
 |---|---|---|---|
 | 0 | Supervisor | Typical visit profile | Fills in shared context, fans out to agents 1–4 |
-| 1 | Waiting Time Agent | XGBoost + Qdrant RAG | Model wait estimate, RAG median of similar visits, current queue depth |
+| 1 | Waiting Time Agent | LightGBM + Qdrant RAG | Model wait estimate, RAG median of similar visits, current queue depth |
 | 2 | Bottleneck Detection Agent | Per-category HMM | Congestion state (Low/Medium/High) per station; flags bottlenecks |
 | 3 | Queue Depth Forecast Agent | LSTM | Next-hour queue depth (4 × 15 min) and trend (rising/falling/stable) |
 | 4 | Resource Planning Agent | Rules on queue load share | Up to 4 options (open a room, reassign floating staff) |
 | 5 | Predictive Analytics Agent | Findings of agents 1–4, no model of its own | Trend-adjusted wait, uncertainty range, outlook, risk score 0–1 |
-| 6 | Result Fusion module | — | Consensus wait (mean of XGBoost and RAG), spread between them |
-| 7 | Validation & Critique Agent | Consistency checks | Confidence score and label (XGBoost vs RAG agreement, HMM vs forecast) |
+| 6 | Result Fusion module | — | Consensus wait (mean of LightGBM and RAG), spread between them |
+| 7 | Validation & Critique Agent | Consistency checks | Confidence score and label (LightGBM vs RAG agreement, HMM vs forecast) |
 | 8 | Decision Support module | Rules | Up to 6 prioritised recommendations |
 | 9 | Reporting | Optional LLM rewrite | Summary for a nurse manager, alerts, full findings |
 
@@ -37,10 +37,10 @@ Details worth knowing:
 
 - **Bottleneck rule:** a station is flagged if its HMM state is High, or Medium with a queue depth of 10 or more.
 - **Trend rule:** rising if the first forecast bucket is more than 15% above the current depth, falling if more than 15% below.
-- **Predicted wait:** XGBoost estimate × 1.15 (rising), × 0.85 (falling), × 1.0 (stable / no data).
-- **Uncertainty:** root-sum-square of the XGBoost and LSTM validation MAEs.
+- **Predicted wait:** LightGBM estimate × 1.15 (rising), × 0.85 (falling), × 1.0 (stable / no data).
+- **Projected wait range:** the LightGBM model's own P10–P90 range for the patient, multiplied by the same trend factor. The LSTM's error is in patients, not minutes, so it is not added to the range.
 - **Risk score:** 0.4 × rising trend + 0.4 × flagged stations (capped at 3) + 0.2 × resource options (capped at 4); high ≥ 0.66, medium ≥ 0.33.
-- **Confidence:** starts at 1.0; −0.3 if XGBoost and RAG differ by more than 50% of the consensus, −0.15 if there is no RAG evidence, −0.2 if HMM and forecast contradict, −0.15 if there is no forecast data; floor 0.2.
+- **Confidence:** starts at 1.0; −0.3 if LightGBM and RAG differ by more than 50% of the consensus, −0.15 if there is no RAG evidence, −0.2 if HMM and forecast contradict, −0.15 if there is no forecast data; floor 0.2.
 
 ### Wait Estimate graph (6 nodes, a retrieval pipeline rather than an agent)
 
@@ -101,7 +101,7 @@ answer styles for this one agent, not separate agents.
       ▼              ▼                  ▼                        ▼
 ┌───────────────┐ ┌─────────────────────────────────┐ ┌──────────────────────┐
 │ Trained models│ │ Qdrant: ttsh_wait_events        │ │ Qdrant: mediq_sop_docs│
-│ XGBoost  (1)  │ │ 5,000 historical wait events    │ │ SOP document chunks  │
+│ LightGBM  (1)  │ │ 5,000 historical wait events    │ │ SOP document chunks  │
 │ HMM      (2)  │ │ used by agent (1) and the       │ │                      │
 │ LSTM     (3)  │ │ Wait Estimate graph             │ │                      │
 │ + livestate   │ └─────────────────────────────────┘ └──────────────────────┘
@@ -111,5 +111,5 @@ answer styles for this one agent, not separate agents.
 ```
 
 The numbers (1)–(5) in the supervisor graph match the agent table above. The arrival
-simulator page also calls `/queue/simulate`, which runs the same XGBoost, HMM and LSTM
+simulator page also calls `/queue/simulate`, which runs the same LightGBM, HMM and LSTM
 models directly without going through a graph.

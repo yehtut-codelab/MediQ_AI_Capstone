@@ -5,14 +5,14 @@ queue depth = patients whose wait has started but service hasn't, bucket series
 feeds the LSTM, recent completed waits feed the HMM.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from app.services.models_service import lstm_meta, wait_meta
+from app.services.models_service import APPOINTMENT_LAG_CLIP, lstm_meta, wait_defaults, wait_meta
 
 CSV_PATH = Path(__file__).resolve().parents[3] / "Clean_Dataset" / "cleaned_events.csv"
 
@@ -24,9 +24,9 @@ CATEGORIES = ["visual_acuity", "consultation", "diagnostic_scan", "biometry",
 def _events() -> pd.DataFrame:
     df = pd.read_csv(
         CSV_PATH,
-        usecols=["clinic_name", "service_category", "waiting_start", "service_start",
-                 "waiting_time_min", "visit_position", "visit_length"],
-        parse_dates=["waiting_start", "service_start"],
+        usecols=["clinic_name", "service_category", "appointment_time", "waiting_start",
+                 "service_start", "waiting_time_min", "visit_position", "visit_length"],
+        parse_dates=["appointment_time", "waiting_start", "service_start"],
     )
     return df.sort_values("waiting_start")
 
@@ -135,13 +135,78 @@ def lstm_bucket_features(clinic: str, category: str, at: datetime) -> np.ndarray
     return np.array(rows, dtype=float) if any_activity else None
 
 
-def typical_visit_profile(clinic: str, category: str) -> dict:
-    """Median visit_position / visit_length for XGB defaults."""
+# Singapore public holidays, the same calendar the wait model was trained with.
+SG_HOLIDAYS = sorted([
+    date(2023, 11, 12), date(2023, 11, 13), date(2023, 12, 25),
+    date(2024, 1, 1), date(2024, 2, 10), date(2024, 2, 11), date(2024, 2, 12),
+    date(2024, 3, 29), date(2024, 4, 10), date(2024, 5, 1),
+    date(2024, 5, 22), date(2024, 6, 17), date(2024, 8, 9),
+    date(2024, 10, 31), date(2024, 12, 25),
+    date(2025, 1, 1), date(2025, 1, 29), date(2025, 1, 30),
+    date(2025, 3, 31), date(2025, 4, 18), date(2025, 5, 1),
+    date(2025, 5, 12), date(2025, 6, 7), date(2025, 6, 9),
+    date(2025, 8, 9), date(2025, 8, 11), date(2025, 10, 20), date(2025, 12, 25),
+])
+
+
+def _holiday_proximity(day: date) -> tuple[int, int]:
+    """(days to the next holiday, days since the last one); 999 when there is none."""
+    to_next = min(((h - day).days for h in SG_HOLIDAYS if h >= day), default=999)
+    since_last = min(((day - h).days for h in SG_HOLIDAYS if h <= day), default=999)
+    return to_next, since_last
+
+
+def wait_model_features(clinic: str, category: str, at: datetime, *,
+                        appointment_lag_min: float | None = None,
+                        visit_position: int | None = None,
+                        exclude_self: bool = False) -> dict:
+    """Numeric inputs of the LightGBM wait model for a patient joining the
+    `category` queue at `clinic` at `at`, built the way the training pipeline
+    built them: queue counts are point-in-time (wait started before `at`,
+    service not yet started) over the whole day's events of BOTH clinics.
+
+    The app has no room or visit history for a new patient, so those inputs,
+    the visit position and a missing appointment lag fall back to the
+    station's typical values (models_service.wait_defaults).
+
+    `exclude_self` is for scoring a patient who is already in the dataset: it
+    removes their own appointment from the appointment-density count."""
+    defaults = wait_defaults(clinic, category)
     df = _events()
-    sub = df[(df["clinic_name"] == clinic) & (df["service_category"] == category)]
-    if sub.empty:
-        return {"visit_position": 1, "visit_length": 2}
+    day_start = at.replace(hour=0, minute=0, second=0, microsecond=0)
+    day = df[(df["waiting_start"] >= day_start) & (df["waiting_start"] < day_start + timedelta(days=1))]
+
+    def waiting(frame: pd.DataFrame, t: datetime) -> int:
+        return int(((frame["waiting_start"] < t) & (frame["service_start"] > t)).sum())
+
+    same_cat = day[day["service_category"] == category]
+    depth = waiting(same_cat, at)
+    depth_lag = waiting(same_cat, at - timedelta(minutes=15))
+
+    lag = defaults["appointment_lag_clipped"] if appointment_lag_min is None else appointment_lag_min
+    lag = float(np.clip(lag, *APPOINTMENT_LAG_CLIP))
+    appointment = at - timedelta(minutes=lag)
+    density = int(day["appointment_time"].between(appointment, appointment + timedelta(minutes=30)).sum())
+    if exclude_self:
+        density = max(0, density - 1)
+
+    to_next, since_last = _holiday_proximity(at.date())
     return {
-        "visit_position": int(sub["visit_position"].median()),
-        "visit_length": int(sub["visit_length"].median()),
+        "clinic_encoded": wait_meta()["clinic_encoding"][clinic],
+        "hour_of_day": at.hour,
+        "day_of_week": at.weekday(),
+        "month": at.month,
+        "visit_position": defaults["visit_position"] if visit_position is None else visit_position,
+        "appointment_lag_clipped": lag,
+        "queue_depth": depth,
+        "queue_depth_lag1": depth_lag,
+        "queue_drain_rate": (depth_lag - depth) / 15.0,
+        "room_queue_depth": defaults["room_queue_depth"],
+        "cross_cat_load": waiting(day, at),
+        "consultation_queue_at_arrival": waiting(day[day["service_category"] == "consultation"], at),
+        "appointment_density_next30": density,
+        "room_number_encoded": defaults["room_number_encoded"],
+        "prior_visit_count": defaults["prior_visit_count"],
+        "days_to_next_holiday": to_next,
+        "days_since_last_holiday": since_last,
     }

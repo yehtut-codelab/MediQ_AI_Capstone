@@ -1,6 +1,7 @@
 pandas>=2.2
 openpyxl>=3.1
-xgboost>=2.0
+lightgbm>=4.0
+xgboost>=2.0  # legacy wait model, only for scripts/audit_wait_model.py
 hmmlearn>=0.3
 joblib>=1.3
 torch>=2.0

@@ -1,5 +1,6 @@
 import json
 import random
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from app.schemas import (
     DocumentOut,
     EstimateResponse,
     ForecastBucket,
+    GoldenSample,
     PatientRegistration,
     QueueSimulationRequest,
     QueueSimulationResponse,
@@ -28,6 +30,7 @@ from app.schemas import (
     SimilarEvent,
 )
 from app.services import document_registry, livestate, models_service, qa_feedback, registry, stations, topics
+from app.services.golden_samples import GOLDEN_SAMPLES
 from app.services.pathway import build_pathway, classify
 from app.services.qdrant_service import collection_status, get_client
 from app.services.sop_ingest import SUPPORTED_EXTENSIONS, ingest_file
@@ -67,23 +70,19 @@ SERVICE_TYPE_TO_CATEGORY: dict[str, str] = {
 
 def _run_queue_models(clinic: str, category: str, at: datetime, *,
                       visit_position: int | None = None,
-                      visit_length: int | None = None,
-                      appointment_lag_min: float = 0.0) -> dict:
-    """XGBoost wait estimate + HMM congestion state + LSTM queue-depth
+                      appointment_lag_min: float | None = None) -> dict:
+    """LightGBM wait estimate + HMM congestion state + LSTM queue-depth
     forecast for one clinic/category at a tz-naive timestamp inside
     livestate.dataset_range(). Shared by /queue/simulate and /patients/register
-    so both surfaces run the exact same model pipeline."""
-    profile = livestate.typical_visit_profile(clinic, category)
-    vp = visit_position if visit_position is not None else profile["visit_position"]
-    vl = visit_length if visit_length is not None else profile["visit_length"]
-
+    so both surfaces run the exact same model pipeline. `appointment_lag_min`
+    is arrival minus appointment; None means no appointment was given."""
     depth = livestate.queue_depth(clinic, category, at)
-    model_wait = models_service.predict_wait_min(
-        category=category, clinic=clinic, hour=at.hour, day_of_week=at.weekday(),
-        month=at.month, visit_position=vp, visit_length=vl,
-        appointment_lag_min=appointment_lag_min, queue_depth=depth,
-    )
-    mae = models_service.wait_meta().get("evaluation", {}).get("val_MAE_min", 0.0)
+    wait = models_service.predict_wait(category, livestate.wait_model_features(
+        clinic, category, at,
+        appointment_lag_min=appointment_lag_min, visit_position=visit_position,
+    ))
+    model_wait = wait["estimate_min"]
+    mae = models_service.wait_error_min(has_appointment=appointment_lag_min is not None)
 
     waits = livestate.recent_waits(clinic, category, at)
     congestion = models_service.congestion_state(category, waits)
@@ -109,6 +108,10 @@ def _run_queue_models(clinic: str, category: str, at: datetime, *,
         "queue_depth": depth,
         "model_estimate_min": round(model_wait, 1),
         "model_mae_min": mae,
+        "model_range_min": (round(wait["p10_min"], 1), round(wait["p90_min"], 1)),
+        "breach_limit_min": wait["breach_limit_min"],
+        "breach_probability": round(wait["breach_probability"], 2),
+        "breach_flag": wait["breach_flag"],
         "congestion_state": congestion["state"],
         "congestion_mean_wait_min": congestion.get("state_mean_wait"),
         "congestion_observations": congestion.get("n_observations", 0),
@@ -122,7 +125,7 @@ def _run_queue_models(clinic: str, category: str, at: datetime, *,
 
 @router.post("/arrivals/estimate", response_model=EstimateResponse)
 def estimate_arrival(req: ArrivalRequest) -> EstimateResponse:
-    local = req.arrival_datetime
+    local = req.replay_at or req.arrival_datetime
     result = wait_estimate_graph.invoke({
         "clinic": req.clinic,
         "service_type": req.service_type,
@@ -175,6 +178,29 @@ def sample_arrivals(n: int = 5) -> list[SamplePatient]:
     ]
 
 
+@router.get("/samples/golden", response_model=list[GoldenSample])
+def golden_samples() -> list[GoldenSample]:
+    """Curated demo patients for the Arrival Simulator and New Patient Entry."""
+    return GOLDEN_SAMPLES
+
+
+def _resolve_replay(requested: datetime, replay_at: datetime | None) -> tuple[datetime, bool, str | None]:
+    """(moment to replay clinic state from, whether it differs from the
+    request, note explaining it). A golden sample pins the moment; otherwise
+    an out-of-range request falls back to its nearest analog."""
+    if replay_at is not None:
+        pinned = replay_at.replace(tzinfo=None)
+        lo, hi = livestate.dataset_range()
+        if not lo <= pinned <= hi:
+            raise HTTPException(422, f"replay_at must be within {lo.date()} … {hi.date()}")
+        return pinned, True, (
+            f"Golden sample: clinic state is replayed from "
+            f"{pinned.strftime('%a %Y-%m-%d %H:%M')}, a recorded moment in the historical dataset."
+        )
+    replayed_at, is_analog = livestate.analog_timestamp(requested)
+    return replayed_at, is_analog, _replay_note(requested, replayed_at) if is_analog else None
+
+
 def _replay_note(requested: datetime, replayed_at: datetime) -> str:
     lo, hi = livestate.dataset_range()
     return (
@@ -187,7 +213,7 @@ def _replay_note(requested: datetime, replayed_at: datetime) -> str:
 
 @router.post("/queue/simulate", response_model=QueueSimulationResponse)
 def simulate_queue(req: QueueSimulationRequest) -> QueueSimulationResponse:
-    """Model-based queue simulation: XGBoost wait estimate + HMM congestion
+    """Model-based queue simulation: LightGBM wait estimate + HMM congestion
     state + LSTM queue-depth forecast, driven by the trained models in
     Models/ rather than RAG retrieval. Clinic state is replayed from the
     trained-model dataset (Clean_Dataset); a timestamp outside that dataset's
@@ -197,12 +223,11 @@ def simulate_queue(req: QueueSimulationRequest) -> QueueSimulationResponse:
         raise HTTPException(422, f"category must be one of {livestate.CATEGORIES}")
 
     requested = req.as_of.replace(tzinfo=None)
-    replayed_at, is_analog = livestate.analog_timestamp(requested)
+    replayed_at, is_analog, replay_note = _resolve_replay(requested, req.replay_at)
 
     m = _run_queue_models(
         req.clinic, req.category, replayed_at,
         visit_position=req.visit_position,
-        visit_length=req.visit_length,
         appointment_lag_min=req.appointment_lag_min,
     )
     return QueueSimulationResponse(
@@ -211,10 +236,14 @@ def simulate_queue(req: QueueSimulationRequest) -> QueueSimulationResponse:
         as_of=requested,
         replayed_at=replayed_at,
         is_analog_replay=is_analog,
-        replay_note=_replay_note(requested, replayed_at) if is_analog else None,
+        replay_note=replay_note,
         queue_depth=m["queue_depth"],
         model_estimate_min=m["model_estimate_min"],
         model_mae_min=m["model_mae_min"],
+        model_range_min=m["model_range_min"],
+        breach_limit_min=m["breach_limit_min"],
+        breach_probability=m["breach_probability"],
+        breach_flag=m["breach_flag"],
         status_band=band(m["model_estimate_min"]),
         congestion_state=m["congestion_state"],
         congestion_mean_wait_min=m["congestion_mean_wait_min"],
@@ -227,11 +256,13 @@ def simulate_queue(req: QueueSimulationRequest) -> QueueSimulationResponse:
 @router.post("/patients/register", response_model=RegisteredPatient)
 def register_patient(req: PatientRegistration) -> RegisteredPatient:
     local = req.arrival_datetime
+    # a golden sample searches similar cases by its pinned moment's hour and weekday
+    rag_at = req.replay_at or local
     result = wait_estimate_graph.invoke({
         "clinic": req.clinic,
         "service_type": req.service_type,
-        "hour": local.hour,
-        "day_of_week": local.weekday(),
+        "hour": rag_at.hour,
+        "day_of_week": rag_at.weekday(),
         "diagnosis": req.diagnosis,
         "medical_history": req.medical_history,
         "current_issue": req.current_issue,
@@ -247,7 +278,7 @@ def register_patient(req: PatientRegistration) -> RegisteredPatient:
                          priority=triage_result.priority)
     pathway = build_pathway(archetype)
 
-    # Model-based queue state (XGBoost/HMM/LSTM), same pipeline as
+    # Model-based queue state (LightGBM/HMM/LSTM), same pipeline as
     # /queue/simulate. A timestamp outside the trained-model dataset's range
     # is replayed from the nearest same-weekday/time-of-day analog instead of
     # being skipped — the RAG estimate above always applies regardless, since
@@ -255,14 +286,24 @@ def register_patient(req: PatientRegistration) -> RegisteredPatient:
     # calendar date.
     naive_arrival = local.replace(tzinfo=None) if local.tzinfo else local
     model_category = SERVICE_TYPE_TO_CATEGORY.get(req.service_type, "other")
-    replayed_at, is_analog = livestate.analog_timestamp(naive_arrival)
+    replayed_at, is_analog, replay_note = _resolve_replay(naive_arrival, req.replay_at)
+    # The model's appointment input: minutes the patient arrived after (+) or
+    # before (-) their appointment, when one was entered.
+    appointment_lag = None
+    if req.appointment_datetime is not None:
+        appointment_lag = (naive_arrival - req.appointment_datetime.replace(tzinfo=None)).total_seconds() / 60
     model_fields: dict = {}
     try:
-        m = _run_queue_models(req.clinic, model_category, replayed_at)
+        m = _run_queue_models(req.clinic, model_category, replayed_at,
+                              appointment_lag_min=appointment_lag)
         model_fields = {
             "model_category": model_category,
             "model_estimate_min": m["model_estimate_min"],
             "model_mae_min": m["model_mae_min"],
+            "model_range_min": m["model_range_min"],
+            "model_breach_limit_min": m["breach_limit_min"],
+            "model_breach_probability": m["breach_probability"],
+            "model_breach_flag": m["breach_flag"],
             "model_queue_depth": m["queue_depth"],
             "model_congestion_state": m["congestion_state"],
             "model_congestion_mean_wait_min": m["congestion_mean_wait_min"],
@@ -270,24 +311,30 @@ def register_patient(req: PatientRegistration) -> RegisteredPatient:
             "model_forecast_trend": m["forecast_trend"],
             "model_replayed_at": replayed_at,
             "model_is_analog_replay": is_analog,
-            "model_replay_note": _replay_note(naive_arrival, replayed_at) if is_analog else None,
+            "model_replay_note": replay_note,
         }
     except Exception:
         model_fields = {"model_unavailable_reason": "Model prediction failed unexpectedly."}
 
-    # Headline estimate: the XGBoost prediction, with a range of ± its
-    # validation MAE. RAG is the fallback only if the model could not run.
+    # Headline estimate: the LightGBM prediction, with the P10-P90 range from
+    # its quantile models. RAG is the fallback only if the model could not run.
     model_est = model_fields.get("model_estimate_min")
     if model_est is not None:
         mae = model_fields["model_mae_min"]
         estimate = model_est
-        estimate_range = (round(max(0.0, model_est - mae), 1), round(model_est + mae, 1))
+        low, high = model_fields["model_range_min"]
+        # the point model and the quantile models are separate, so keep the
+        # headline inside the range shown beside it
+        estimate_range = (min(low, round(model_est, 1)), max(high, round(model_est, 1)))
         explanation = (
-            f"Predicted by the XGBoost wait-time model for {model_category.replace('_', ' ')} "
+            f"Predicted by the LightGBM wait-time model for {model_category.replace('_', ' ')} "
             f"at {req.clinic} on {replayed_at:%A} at {replayed_at:%H:%M}, with "
             f"{model_fields['model_queue_depth']} patient(s) already waiting: about "
-            f"{model_est:.0f} minutes (typical error ±{mae:.0f} minutes)."
+            f"{model_est:.0f} minutes, likely between {estimate_range[0]:.0f} and "
+            f"{estimate_range[1]:.0f} minutes (typical error ±{mae:.0f} minutes)."
         )
+        if appointment_lag is None:
+            explanation += " No appointment time was entered, so a typical one was assumed."
         if stats:
             explanation += (
                 f" For comparison, the {stats['n']} most similar historical cases had a "
@@ -356,6 +403,28 @@ def stations_overview() -> dict:
     }
 
 
+@router.get("/stations/weekly")
+def stations_weekly() -> dict:
+    """Per-station historical wait pattern by day of week + today's registered
+    counts. Stations here are trained-model categories, so registrations are
+    rolled up from their service type."""
+    weekly = stations.weekly_profile()
+    counts: dict[tuple[str, str], int] = {}
+    for (clinic, service_type), n in registry.counts_since(_today_start()).items():
+        key = (clinic, SERVICE_TYPE_TO_CATEGORY.get(service_type, "other"))
+        counts[key] = counts.get(key, 0) + n
+    return {
+        **weekly,
+        "clinics": {
+            clinic: [
+                {**s, "registered_today": counts.get((clinic, s["category"]), 0)}
+                for s in station_list
+            ]
+            for clinic, station_list in weekly["clinics"].items()
+        },
+    }
+
+
 class AgentAnalyzeRequest(BaseModel):
     clinic: str = Field(..., examples=["TTSH Eye Centre", "Clinic 1A"])
     category: str = Field(..., examples=["consultation", "visual_acuity", "diagnostic_scan"])
@@ -384,25 +453,120 @@ def agent_analyze(req: AgentAnalyzeRequest) -> dict:
     return report
 
 
+# Process-window labels for the supervisor graph's nodes: (who acts, what it does).
+AGENT_STEP_LABELS = {
+    "supervisor": ("Supervisor", "Parse the objective and delegate"),
+    "waiting_time_agent": ("Specialist", "Waiting Time Analysis — LightGBM model and RAG evidence"),
+    "bottleneck_agent": ("Specialist", "Bottleneck Detection — HMM congestion states"),
+    "queue_depth_forecast_agent": ("Specialist", "Queue Depth Forecasting — LSTM next-hour forecast"),
+    "resource_planning_agent": ("Specialist", "Resource Planning — allocation options"),
+    "clarify": ("Supervisor", "Ask the user to clarify the objective"),
+    "supervisor_review": ("Supervisor", "Collect the specialists' results"),
+    "predictive_agent": ("Specialist", "Predictive Analytics — projected wait and risk"),
+    "supervisor_integrate": ("Supervisor", "Integrate the findings"),
+    "supervisor_validate": ("Supervisor", "Validate the result against the objective"),
+    "decision_support": ("Decision support", "Rank recommendations"),
+    "reporting": ("Reporting", "Write the report summary"),
+}
+
+
+def _agent_step_details(node: str, update: dict) -> list[str]:
+    """What a finished supervisor-graph node produced, as short lines."""
+    if update.get("trace") and "report" not in update:
+        return [f"{t['action']}: {t['detail']}" for t in update["trace"]]
+    f = update.get("findings") or {}
+    if wt := f.get("waiting_time"):
+        rag = (f"RAG median {wt['rag_median_min']} min from {wt['rag_evidence_n']} similar events"
+               if wt["rag_evidence_n"] else "no similar RAG events")
+        return [f"LightGBM estimate {wt['model_estimate_min']} min; {rag}; "
+                f"{wt['current_queue_depth']} in queue"]
+    if bn := f.get("bottlenecks"):
+        return [f"{len(bn['stations'])} stations checked, {len(bn['flagged'])} flagged as bottlenecks"]
+    if fc := f.get("forecast"):
+        depths = ", ".join(str(v) for v in fc["next_hour_queue_depth"]) or "no data"
+        return [f"Queue trend {fc['trend']}; next hour {depths}"]
+    if rp := f.get("resource_planning"):
+        return [f"{len(rp['options'])} resource option(s) proposed"]
+    if pa := f.get("predictive_analysis"):
+        lo, hi = pa["predicted_wait_range_min"]
+        risk = f"; risk {pa['risk_label']}" if pa["risk_label"] else ""
+        return [f"Projected wait {pa['predicted_wait_min']} min (range {lo:.0f}–{hi:.0f}); "
+                f"outlook {pa['outlook']}{risk}"]
+    if "decisions" in update:
+        return [f"{len(update['decisions'])} recommendation(s) ranked"]
+    if node == "reporting":
+        return [f"{len(update['report']['alerts'])} alert(s) raised; report ready"]
+    return []
+
+
+@router.post("/agent/analyze/stream")
+def agent_analyze_stream(req: AgentAnalyzeRequest) -> StreamingResponse:
+    """Same analysis as /agent/analyze, streamed as Server-Sent Events so the
+    console can show each step while it runs. Events (JSON in `data:`):
+      {"type": "step_start", node, actor, label}
+      {"type": "step_done", node, elapsed_s, details: [...]}
+      {"type": "report", "report": {...}}   — final, same shape as /agent/analyze
+      {"type": "error", "message": "..."}"""
+    requested = req.as_of.replace(tzinfo=None)
+    replayed_at, is_analog = livestate.analog_timestamp(requested)
+    state = {"clinic": req.clinic, "category": req.category, "as_of": replayed_at,
+             "objective": req.objective}
+
+    def sse(payload: dict) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    def events():
+        started: dict[str, float] = {}
+        report = None
+        try:
+            for mode, data in supervisor_graph.stream(state, stream_mode=["tasks", "updates"]):
+                if mode == "tasks":
+                    if "result" not in data:  # a node starting; its finish arrives as an update
+                        node = data["name"]
+                        started[node] = time.perf_counter()
+                        actor, label = AGENT_STEP_LABELS.get(node, ("Agent", node))
+                        yield sse({"type": "step_start", "node": node, "actor": actor, "label": label})
+                    continue
+                for node, update in data.items():
+                    if not isinstance(update, dict):
+                        continue
+                    report = update.get("report", report)
+                    yield sse({
+                        "type": "step_done", "node": node,
+                        "elapsed_s": round(time.perf_counter() - started.get(node, time.perf_counter()), 1),
+                        "details": _agent_step_details(node, update),
+                    })
+            report["requested_as_of"] = requested.isoformat()
+            report["is_analog_replay"] = is_analog
+            report["replay_note"] = _replay_note(requested, replayed_at) if is_analog else None
+            yield sse({"type": "report", "report": report})
+        except Exception as e:  # surface to the client; the HTTP status is already 200
+            yield sse({"type": "error", "message": str(e)[:300]})
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @router.get("/models/wait-time")
 def wait_time_model_card() -> dict:
-    """Model card for the XGBoost wait-time regressor: validation metrics,
-    baselines it was compared against, features, and the data it learned from."""
+    """Model card for the LightGBM wait-time model: the data it learned from,
+    its inputs, and its hold-out accuracy as this app calls it (see
+    scripts/audit_lgbm_global.py), next to the simple baselines."""
     meta = models_service.wait_meta()
-    lo, hi = livestate.dataset_range()
+    profile = models_service.wait_profile()
     return {
-        "name": "XGBoost wait-time regressor",
-        "algorithm": "Gradient-boosted decision trees (XGBoost)",
-        "target": meta["target"],
-        "target_transform": meta["target_transform"],
-        "features": meta["features"],
-        "boosting_rounds": meta["best_iteration"] + 1,
-        "train_cutoff": meta["train_cutoff"],
-        "dataset_min": lo.isoformat(),
-        "dataset_max": hi.isoformat(),
-        "dataset_events": livestate.dataset_size(),
-        "evaluation": meta["evaluation"],
-        "baselines": meta["baselines"],
+        "name": "LightGBM wait-time model",
+        "algorithm": "Gradient-boosted decision trees (LightGBM)",
+        "features": ["service_category", *meta["features"]],
+        # inputs the app has no value for and fills with the station's typical value
+        "defaulted_features": ["room_number_encoded", "room_queue_depth", "prior_visit_count",
+                               "visit_position"],
+        "train": profile["train"],
+        "test": profile["test"],
+        "evaluation": profile["evaluation"],
+        "range": profile["range"],
+        "breach": {**profile["breach"], "limits_min": meta["breach_thresholds_min"]},
+        "baselines": profile["baselines"],
     }
 
 

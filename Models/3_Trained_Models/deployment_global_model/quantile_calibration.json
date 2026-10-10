@@ -1,0 +1,52 @@
+{
+  "method": "split-conformal shift fitted on the validation window, evaluated on the test window",
+  "fitted_on": "validation window 2025-05-30 .. 2025-07-30",
+  "usage": "calibrated bound = max(0, model prediction + shift_min[category][q]); then sort P10<=P50<=P90",
+  "shift_min": {
+    "visual_acuity": {
+      "p10": -0.152,
+      "p50": -0.204,
+      "p90": -0.04
+    },
+    "consultation": {
+      "p10": -0.784,
+      "p50": -1.143,
+      "p90": -0.442
+    },
+    "diagnostic_scan": {
+      "p10": -0.049,
+      "p50": -0.204,
+      "p90": 0.241
+    },
+    "biometry": {
+      "p10": -0.502,
+      "p50": -1.477,
+      "p90": -2.599
+    },
+    "visual_field_test": {
+      "p10": -0.288,
+      "p50": -0.153,
+      "p90": -0.333
+    },
+    "refraction": {
+      "p10": -0.075,
+      "p50": -0.594,
+      "p90": -1.281
+    },
+    "laser_procedure": {
+      "p10": 0.186,
+      "p50": -0.003,
+      "p90": 0.9
+    },
+    "treatment": {
+      "p10": 0.045,
+      "p50": 0.201,
+      "p90": 0.992
+    },
+    "other": {
+      "p10": -0.093,
+      "p50": -0.028,
+      "p90": 0.882
+    }
+  }
+}

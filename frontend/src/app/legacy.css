@@ -142,6 +142,8 @@ a { color: inherit; }
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
+.logo-link { display: block; color: inherit; text-decoration: none; border-radius: 4px; }
+.logo-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 .logo-sub { font-size: 11.5px; font-weight: 500; opacity: 0.72; letter-spacing: 0.3px; margin-top: 2px; white-space: nowrap; }
 
 /* ---------------- layout ---------------- */
@@ -699,6 +701,74 @@ body:has(.qa-page) { height: 100vh; display: flex; flex-direction: column; overf
 .hourly-bars { display: flex; align-items: flex-end; gap: 2px; height: 44px; margin-top: 10px; }
 .hourly-bar { flex: 1; border-radius: 2px 2px 0 0; min-width: 4px; }
 .hourly-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--ink-mute); margin-top: 2px; }
+
+/* Hourly bars with a range: solid median over a pale 90th-percentile bar. */
+.hourly-range-bars { display: flex; align-items: stretch; gap: 2px; height: 56px; margin-top: 10px; }
+.hourly-col { flex: 1; position: relative; min-width: 4px; }
+.hourly-range, .hourly-median { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 2px 2px 0 0; }
+.hourly-range { opacity: 0.22; }
+
+.week-strip { display: flex; gap: 3px; margin-top: 10px; }
+.week-cell {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 3px 0; font-size: 9px; color: var(--ink-mute); cursor: pointer;
+  background: transparent; border: 1px solid var(--border-soft); border-radius: 4px;
+}
+.week-cell b { font-size: 12px; font-weight: 600; color: var(--ink-mute); }
+.week-cell.active { border-color: var(--mediq-navy); background: var(--mediq-blue-l); }
+
+/* Golden demo sample picker above the arrival / registration forms. */
+/* Agent Console: collapsible process window under the Run button. */
+.process { margin-top: 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+.process summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; font-size: 12px; background: var(--border-soft);
+}
+.process summary::-webkit-details-marker { display: none; }
+.process summary::before { content: "▸"; font-size: 10px; color: var(--ink-soft); }
+.process[open] summary::before { content: "▾"; }
+.process-title { font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--mediq-navy); }
+.process-status { color: var(--ink-soft); }
+.process-steps { list-style: none; margin: 0; padding: 12px 14px; display: grid; gap: 10px; max-height: 340px; overflow-y: auto; }
+.process-step { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; font-size: 13px; animation: rise-in 0.25s ease-out; }
+.process-mark {
+  width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; background: var(--mediq-green);
+}
+.process-step.running .process-mark {
+  background: none; border: 2px solid var(--border); border-top-color: var(--mediq-blue);
+  animation: process-spin 0.8s linear infinite;
+}
+.process-time { font-size: 11.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.process-foot { padding: 8px 14px; border-top: 1px solid var(--border-soft); font-size: 11.5px; color: var(--ink-soft); }
+@keyframes process-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .process-step, .process-step.running .process-mark { animation: none; }
+}
+
+.golden { margin-bottom: 16px; }
+.golden-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--mediq-gold); margin-bottom: 8px; }
+.golden-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.golden-card {
+  display: flex; flex-direction: column; gap: 3px; text-align: left; cursor: pointer;
+  padding: 9px 12px; background: var(--mediq-gold-l); color: var(--ink);
+  border: 1px solid var(--border); border-left: 3px solid var(--mediq-gold); border-radius: var(--r-md);
+}
+.golden-card:hover { border-color: var(--mediq-gold); }
+.golden-card.active { background: var(--mediq-navy); border-color: var(--mediq-navy); color: #fff; }
+.golden-label { font-size: 12.5px; font-weight: 700; }
+.golden-story { font-size: 11px; opacity: 0.85; line-height: 1.35; }
+
+/* Method and accuracy panel under the station grid. */
+.method-callout {
+  background: var(--mediq-blue-l); border-left: 4px solid var(--mediq-blue);
+  border-radius: var(--r-md); padding: 14px 18px; font-size: 13px; color: var(--ink);
+}
+.method-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--mediq-blue); }
+.method-name { font-size: 19px; font-weight: 600; font-family: var(--font-display); color: var(--mediq-navy); margin: 2px 0 6px; }
+.method-stats { display: flex; gap: 36px; flex-wrap: wrap; margin: 18px 0; }
+.method-note { font-size: 13px; color: var(--ink-soft); margin: 0 0 12px; max-width: 860px; }
+.method-list { font-size: 13px; color: var(--ink-soft); margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 
 @media (max-width: 640px) {
   .station-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }

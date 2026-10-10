@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import SuggestField from "@/components/SuggestField";
 import { BAND_LABEL } from "@/lib/band";
 import { CURRENT_ISSUE_OPTIONS, DIAGNOSIS_OPTIONS, HISTORY_OPTIONS } from "@/lib/clinicalOptions";
-import { nowLocal } from "@/lib/datetime";
+import { nowLocal, todayAt } from "@/lib/datetime";
+import { GoldenSamples, type GoldenSample } from "@/components/GoldenSamples";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -49,6 +50,10 @@ type RegisteredPatient = {
   model_category: string | null;
   model_estimate_min: number | null;
   model_mae_min: number | null;
+  // Breach = predicted to wait past the clinical limit for the service. Only on a fresh registration.
+  model_breach_limit_min?: number | null;
+  model_breach_probability?: number | null;
+  model_breach_flag?: boolean | null;
   model_queue_depth: number | null;
   model_congestion_state: "Low" | "Medium" | "High" | "unknown" | null;
   model_congestion_mean_wait_min: number | null;
@@ -60,76 +65,99 @@ type RegisteredPatient = {
   model_unavailable_reason: string | null;
 };
 
+type Metrics = { MAE: number; RMSE: number; R2: number };
+type DataWindow = { events: number; from: string; to: string };
+
 type ModelCard = {
   name: string;
   algorithm: string;
-  target_transform: string;
   features: string[];
-  boosting_rounds: number;
-  train_cutoff: string;
-  dataset_min: string;
-  dataset_max: string;
-  dataset_events: number;
-  evaluation: { val_MAE_min: number; val_RMSE_min: number; val_R2: number };
-  baselines: { label: string; MAE: number; RMSE: number; R2: number }[];
+  // Inputs this app has no value for; the station's typical value is used.
+  defaulted_features: string[];
+  train: DataWindow;
+  test: DataWindow;
+  // Hold-out accuracy: with every input as trained, as this app calls the
+  // model, and as this app calls it when no appointment time is entered.
+  evaluation: { as_trained: Metrics; app: Metrics; app_no_appointment: Metrics };
+  range: { share_within_p10_p90: number };
+  breach: { precision: number; recall: number };
+  baselines: ({ label: string } & Metrics)[];
 };
 
 const FEATURE_LABEL: Record<string, string> = {
-  cat_encoded: "Service category",
+  service_category: "Service category",
   clinic_encoded: "Clinic",
   hour_of_day: "Hour of day",
   day_of_week: "Day of week",
   month: "Month",
   visit_position: "Step in the visit",
-  visit_length: "Steps in the visit",
   appointment_lag_clipped: "Early / late vs appointment",
   queue_depth: "Patients already waiting",
+  queue_depth_lag1: "Queue 15 min ago",
+  queue_drain_rate: "How fast the queue is moving",
+  room_queue_depth: "Queue for the room",
+  cross_cat_load: "Patients waiting, all services",
+  consultation_queue_at_arrival: "Consultation queue",
+  appointment_density_next30: "Appointments in the next 30 min",
+  room_number_encoded: "Room",
+  prior_visit_count: "Previous visits",
+  days_to_next_holiday: "Days to next holiday",
+  days_since_last_holiday: "Days since last holiday",
 };
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
 
-// Validation error of the model against the simple baselines it was compared
-// with: one bar per predictor, shorter is better.
+// Hold-out error of the model, as this app calls it, against simple
+// baselines: one bar per predictor, shorter is better.
 function ModelStats({ card }: { card: ModelCard }) {
-  const ev = card.evaluation;
+  const ev = card.evaluation.app;
   const rows = [
-    ...card.baselines.map((b) => ({ label: b.label.replace(/^B\d+:\s*/, "") + " (baseline)", mae: b.MAE, model: false })),
-    { label: "XGBoost model", mae: ev.val_MAE_min, model: true },
+    ...card.baselines.map((b) => ({ label: b.label + " (baseline)", mae: b.MAE, model: false })),
+    { label: "LightGBM model", mae: ev.MAE, model: true },
   ];
   const max = Math.max(...rows.map((r) => r.mae));
   const best = Math.min(...card.baselines.map((b) => b.MAE));
-  const gain = Math.round(((best - ev.val_MAE_min) / best) * 100);
+  const gain = Math.round(((best - ev.MAE) / best) * 100);
   return (
     <>
       <p className="muted" style={{ marginTop: 0, marginBottom: 14, fontSize: 13 }}>
         Every wait on this page is predicted by a machine-learning model ({card.algorithm}) trained on{" "}
-        <strong>{card.dataset_events.toLocaleString()}</strong> historical visit events from{" "}
-        {fmtDate(card.dataset_min)} to {fmtDate(card.dataset_max)}.
+        <strong>{card.train.events.toLocaleString()}</strong> historical visit events from{" "}
+        {fmtDate(card.train.from)} to {fmtDate(card.train.to)}. The figures below were measured on{" "}
+        {card.test.events.toLocaleString()} later events ({fmtDate(card.test.from)} to {fmtDate(card.test.to)}),
+        with the model given only what this page knows at registration.
       </p>
       <div style={{ display: "flex", gap: 36, flexWrap: "wrap", marginBottom: 18 }}>
         <div>
-          <div className="muted">Typical error (validation MAE)</div>
+          <div className="muted">Typical error (test MAE)</div>
           <div className="kpi-primary" style={{ color: "var(--mediq-blue)" }}>
-            ±{ev.val_MAE_min.toFixed(1)}
+            ±{ev.MAE.toFixed(1)}
             <span style={{ fontSize: 18 }}> min</span>
+          </div>
+          <div className="muted">
+            ±{card.evaluation.app_no_appointment.MAE.toFixed(1)} min with no appointment time
           </div>
         </div>
         <div>
           <div className="muted">RMSE</div>
-          <div className="kpi-secondary">{ev.val_RMSE_min.toFixed(1)} min</div>
+          <div className="kpi-secondary">{ev.RMSE.toFixed(1)} min</div>
         </div>
         <div>
           <div className="muted">R² (variation explained)</div>
-          <div className="kpi-secondary">{ev.val_R2.toFixed(2)}</div>
+          <div className="kpi-secondary">{ev.R2.toFixed(2)}</div>
         </div>
         <div>
           <div className="muted">vs best baseline</div>
           <div className="kpi-secondary" style={{ color: "var(--mediq-green)" }}>{gain}% lower error</div>
         </div>
+        <div>
+          <div className="muted">If the room were known</div>
+          <div className="kpi-secondary">±{card.evaluation.as_trained.MAE.toFixed(1)} min</div>
+        </div>
       </div>
 
-      <div className="muted" style={{ marginBottom: 6 }}>Mean absolute error on validation data — lower is better</div>
+      <div className="muted" style={{ marginBottom: 6 }}>Mean absolute error on test data — lower is better</div>
       <div style={{ display: "grid", gap: 6, maxWidth: 560, marginBottom: 16 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ display: "grid", gridTemplateColumns: "170px 1fr 70px", gap: 10, alignItems: "center" }}>
@@ -149,17 +177,27 @@ function ModelStats({ card }: { card: ModelCard }) {
         ))}
       </div>
 
-      <div className="muted" style={{ marginBottom: 6 }}>Inputs the model uses</div>
+      <div className="muted" style={{ marginBottom: 6 }}>
+        Inputs the model uses — grey inputs are not known at registration, so the station&apos;s typical value is used
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         {card.features.map((f) => (
-          <span key={f} className="station-reg" style={{ marginTop: 0, fontSize: 11, padding: "3px 9px" }}>
+          <span
+            key={f}
+            className="station-reg"
+            style={{
+              marginTop: 0, fontSize: 11, padding: "3px 9px",
+              ...(card.defaulted_features.includes(f) && { background: "var(--border-soft)", color: "var(--ink-mute)" }),
+            }}
+          >
             {FEATURE_LABEL[f] ?? f}
           </span>
         ))}
       </div>
       <p className="muted">
-        {card.boosting_rounds} boosting rounds · predicts log-transformed waiting time · train cutoff{" "}
-        {fmtDate(card.train_cutoff)}
+        Likely range: {Math.round(card.range.share_within_p10_p90 * 100)}% of test waits fell inside the
+        range shown. Limit warning: {Math.round(card.breach.precision * 100)}% of flagged patients did wait
+        past the limit, and {Math.round(card.breach.recall * 100)}% of patients who did were flagged.
       </p>
     </>
   );
@@ -225,6 +263,8 @@ export default function RegisterPatient() {
   const [diagnosis, setDiagnosis] = useState("");
   const [history, setHistory] = useState("");
   const [currentIssue, setCurrentIssue] = useState("");
+  // A picked golden sample pins the clinic state; editing clinic, service or arrival unpins it.
+  const [golden, setGolden] = useState<GoldenSample | null>(null);
   const [registered, setRegistered] = useState<RegisteredPatient | null>(null);
   const [queue, setQueue] = useState<RegisteredPatient[]>([]);
   const [modelCard, setModelCard] = useState<ModelCard | null>(null);
@@ -249,6 +289,20 @@ export default function RegisterPatient() {
       .catch(() => {});
   }, []);
 
+  function pickGolden(s: GoldenSample) {
+    setName(s.display_name);
+    setPatientId("");
+    setClinic(s.clinic);
+    setServiceType(s.service_type);
+    setArrival(todayAt(s.arrival_time));
+    setAppointment(todayAt(s.appointment_time));
+    setDiagnosis(s.diagnosis);
+    setHistory(s.medical_history);
+    setCurrentIssue(s.current_issue);
+    setGolden(s);
+    setError("");
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -264,6 +318,7 @@ export default function RegisterPatient() {
           service_type: serviceType,
           arrival_datetime: `${arrival}:00+08:00`,
           appointment_datetime: appointment ? `${appointment}:00+08:00` : null,
+          replay_at: golden?.replay_at ?? null,
           diagnosis: diagnosis || null,
           medical_history: history || null,
           current_issue: currentIssue || null,
@@ -278,6 +333,7 @@ export default function RegisterPatient() {
       setDiagnosis("");
       setHistory("");
       setCurrentIssue("");
+      setGolden(null);
       refreshQueue();
     } catch (err) {
       setError(String(err));
@@ -297,6 +353,7 @@ export default function RegisterPatient() {
       <div className="panel">
         <div className="panel-head">New Patient Entry — Registration</div>
         <div className="panel-body">
+          <GoldenSamples selected={golden} onPick={pickGolden} />
           <form className="form-grid" onSubmit={submit}>
             <div>
               <label>Patient Name (demo only, not persisted)</label>
@@ -318,7 +375,7 @@ export default function RegisterPatient() {
             </div>
             <div>
               <label>Clinic</label>
-              <select value={clinic} onChange={(e) => setClinic(e.target.value)}>
+              <select value={clinic} onChange={(e) => { setClinic(e.target.value); setGolden(null); }}>
                 {CLINICS.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
@@ -326,7 +383,7 @@ export default function RegisterPatient() {
             </div>
             <div>
               <label>Service Type</label>
-              <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+              <select value={serviceType} onChange={(e) => { setServiceType(e.target.value); setGolden(null); }}>
                 {SERVICE_TYPES.map((s) => (
                   <option key={s}>{s}</option>
                 ))}
@@ -337,7 +394,7 @@ export default function RegisterPatient() {
               <input
                 type="datetime-local"
                 value={arrival}
-                onChange={(e) => setArrival(e.target.value)}
+                onChange={(e) => { setArrival(e.target.value); setGolden(null); }}
                 required
               />
             </div>
@@ -396,7 +453,7 @@ export default function RegisterPatient() {
                 </div>
                 <div>
                   <div className="muted">
-                    {registered.model_estimate_min != null ? "Predicted wait — XGBoost model" : "Estimated wait"}
+                    {registered.model_estimate_min != null ? "Predicted wait — LightGBM model" : "Estimated wait"}
                   </div>
                   <div className={`estimate-value band-${registered.status_band}`}>
                     {Math.round(registered.estimated_wait_min)}
@@ -408,7 +465,7 @@ export default function RegisterPatient() {
               <div className="muted" style={{ marginTop: 6 }}>
                 {registered.display_name ? `${registered.display_name} · ` : ""}
                 Patient #{registered.patient_id} · {registered.service_type} ·{" "}
-                {registered.clinic} · range {registered.range_min[0]}–{registered.range_min[1]} min
+                {registered.clinic} · likely range {registered.range_min[0]}–{registered.range_min[1]} min
               </div>
               {registered.model_estimate_min != null && (
                 <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -418,13 +475,17 @@ export default function RegisterPatient() {
                       padding: "2px 8px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
                     }}
                   >
-                    ML model · XGBoost
+                    ML model · LightGBM
                   </span>
                   <span style={{ fontSize: 13 }}>
                     typical error ±{registered.model_mae_min?.toFixed(1)} min
-                    {modelCard &&
-                      ` · R² ${modelCard.evaluation.val_R2.toFixed(2)} · trained on ${modelCard.dataset_events.toLocaleString()} historical events`}
+                    {modelCard && ` · trained on ${modelCard.train.events.toLocaleString()} historical events`}
                   </span>
+                </div>
+              )}
+              {registered.model_breach_flag && (
+                <div style={{ marginTop: 6, fontSize: 13, color: "var(--mediq-red)", fontWeight: 600 }}>
+                  ⚠ May wait past the {registered.model_breach_limit_min}-minute limit for this service
                 </div>
               )}
               {registered.rag_estimate_min != null && registered.rag_range_min && (
@@ -542,7 +603,7 @@ export default function RegisterPatient() {
             }}
           >
             <span>
-              Prediction Model — {modelCard.name} · typical error ±{modelCard.evaluation.val_MAE_min.toFixed(1)} min
+              Prediction Model — {modelCard.name} · typical error ±{modelCard.evaluation.app.MAE.toFixed(1)} min
             </span>
             <span aria-hidden="true">{modelOpen ? "▾ Hide" : "▸ Show"}</span>
           </button>

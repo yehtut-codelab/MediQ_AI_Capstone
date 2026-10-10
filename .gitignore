@@ -27,3 +27,15 @@ backend/models/artifacts/
 # large local-only reference/model code dump — not part of the app
 models_codes.zip
 models_codes/
+
+# generated reports, notes and diagrams — kept locally, not part of the app
+BACKEND_AGENTS_REPORT*
+*.docx
+~$*
+report_diagrams/
+claude_session.txt
+
+# trained-model hand-over: the app loads only deployment_global_model/
+Models/3_Trained_Models.zip
+Models/3_Trained_Models/extended_through_may2026/
+Models/3_Trained_Models/per_category_models/

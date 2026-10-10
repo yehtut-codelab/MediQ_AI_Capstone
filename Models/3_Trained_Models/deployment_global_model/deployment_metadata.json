@@ -1,0 +1,77 @@
+{
+  "description": "single global LightGBM waiting-time model (service category as input) for deployment",
+  "features": [
+    "clinic_encoded",
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "visit_position",
+    "appointment_lag_clipped",
+    "queue_depth",
+    "queue_depth_lag1",
+    "queue_drain_rate",
+    "room_queue_depth",
+    "cross_cat_load",
+    "consultation_queue_at_arrival",
+    "appointment_density_next30",
+    "room_number_encoded",
+    "prior_visit_count",
+    "days_to_next_holiday",
+    "days_since_last_holiday"
+  ],
+  "categories": [
+    "visual_acuity",
+    "consultation",
+    "diagnostic_scan",
+    "biometry",
+    "visual_field_test",
+    "refraction",
+    "laser_procedure",
+    "treatment",
+    "other"
+  ],
+  "category_encoding": {
+    "visual_acuity": 0,
+    "consultation": 1,
+    "diagnostic_scan": 2,
+    "biometry": 3,
+    "visual_field_test": 4,
+    "refraction": 5,
+    "laser_procedure": 6,
+    "treatment": 7,
+    "other": 8
+  },
+  "clinic_encoding": {
+    "Clinic 1A": 0,
+    "TTSH Eye Centre": 1
+  },
+  "target_transform": "expm1 of model output, clipped at 0",
+  "point_model": "lgbm_global.pkl (runs/global_model)",
+  "best_params": {
+    "num_leaves": 212,
+    "learning_rate": 0.0249064396938244,
+    "min_child_samples": 18,
+    "subsample": 0.8421165132560784,
+    "colsample_bytree": 0.6640914962437607,
+    "reg_alpha": 0.3661147045343365,
+    "reg_lambda": 2.475884550556351
+  },
+  "quantile_models": "lgbm_global_p10/p50/p90.pkl (raw target, early stopping 20)",
+  "breach_classifier": "breach_classifier.pkl (submitted)",
+  "breach_thresholds_min": {
+    "visual_acuity": 20,
+    "consultation": 45,
+    "visual_field_test": 60,
+    "default": 30
+  },
+  "breach_decision_threshold": 0.4,
+  "split": {
+    "scheme": "chronological",
+    "val_cutoff": "2025-05-30",
+    "test_cutoff": "2025-07-30",
+    "max_date": "2025-09-30",
+    "test_months": 2,
+    "val_months": 2
+  },
+  "trained_through": "2025-05-30"
+}

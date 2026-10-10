@@ -1,0 +1,182 @@
+{
+ "rows": {
+  "before_test": 716939,
+  "test": 73369
+ },
+ "features": [
+  "service_cat",
+  "clinic_encoded",
+  "hour_of_day",
+  "day_of_week",
+  "month",
+  "visit_position",
+  "appointment_lag_clipped",
+  "queue_depth",
+  "queue_depth_lag1",
+  "queue_drain_rate",
+  "room_queue_depth",
+  "cross_cat_load",
+  "consultation_queue_at_arrival",
+  "appointment_density_next30",
+  "room_number_encoded",
+  "prior_visit_count",
+  "days_to_next_holiday",
+  "days_since_last_holiday"
+ ],
+ "hour_of_day_equals_service_start_hour": 1.0,
+ "hour_of_day_equals_arrival_hour": 0.644,
+ "lightgbm": {
+  "as trained (reference)": {
+   "MAE": 11.4,
+   "RMSE": 19.04,
+   "R2": 0.508
+  },
+  "arrival hour instead of service-start hour": {
+   "MAE": 11.26,
+   "RMSE": 18.67,
+   "R2": 0.527
+  },
+  "typical room (room unknown)": {
+   "MAE": 14.72,
+   "RMSE": 23.93,
+   "R2": 0.223
+  },
+  "typical prior visits (history unknown)": {
+   "MAE": 11.41,
+   "RMSE": 19.04,
+   "R2": 0.508
+  },
+  "typical visit position": {
+   "MAE": 11.44,
+   "RMSE": 19.22,
+   "R2": 0.499
+  },
+  "app conditions: arrival hour, no room, no history": {
+   "MAE": 14.7,
+   "RMSE": 23.87,
+   "R2": 0.227
+  },
+  "app conditions + typical visit position": {
+   "MAE": 14.78,
+   "RMSE": 24.04,
+   "R2": 0.216
+  },
+  "app conditions + typical visit position, no appointment time": {
+   "MAE": 15.6,
+   "RMSE": 25.44,
+   "R2": 0.122
+  }
+ },
+ "baselines": {
+  "station median": {
+   "MAE": 15.88,
+   "RMSE": 25.4,
+   "R2": 0.124
+  },
+  "station + arrival-hour median": {
+   "MAE": 15.69,
+   "RMSE": 25.19,
+   "R2": 0.139
+  },
+  "station + weekday + arrival-hour median (Station Overview)": {
+   "MAE": 15.65,
+   "RMSE": 25.08,
+   "R2": 0.146
+  },
+  "station + weekday + service-start-hour median": {
+   "MAE": 14.47,
+   "RMSE": 23.19,
+   "R2": 0.271
+  }
+ },
+ "per_category": {
+  "visual_acuity": {
+   "n": 15945,
+   "as_trained_MAE": 6.33,
+   "app_conditions_MAE": 7.42,
+   "weekday_hour_median_MAE": 7.69
+  },
+  "consultation": {
+   "n": 30938,
+   "as_trained_MAE": 16.51,
+   "app_conditions_MAE": 22.67,
+   "weekday_hour_median_MAE": 24.21
+  },
+  "diagnostic_scan": {
+   "n": 8570,
+   "as_trained_MAE": 5.85,
+   "app_conditions_MAE": 6.2,
+   "weekday_hour_median_MAE": 6.54
+  },
+  "biometry": {
+   "n": 1680,
+   "as_trained_MAE": 9.29,
+   "app_conditions_MAE": 10.35,
+   "weekday_hour_median_MAE": 12.06
+  },
+  "visual_field_test": {
+   "n": 1030,
+   "as_trained_MAE": 9.33,
+   "app_conditions_MAE": 11.45,
+   "weekday_hour_median_MAE": 11.03
+  },
+  "refraction": {
+   "n": 2741,
+   "as_trained_MAE": 8.38,
+   "app_conditions_MAE": 8.85,
+   "weekday_hour_median_MAE": 9.18
+  },
+  "laser_procedure": {
+   "n": 3792,
+   "as_trained_MAE": 8.93,
+   "app_conditions_MAE": 11.28,
+   "weekday_hour_median_MAE": 12.29
+  },
+  "treatment": {
+   "n": 3585,
+   "as_trained_MAE": 11.51,
+   "app_conditions_MAE": 13.7,
+   "weekday_hour_median_MAE": 14.24
+  },
+  "other": {
+   "n": 5088,
+   "as_trained_MAE": 10.02,
+   "app_conditions_MAE": 13.03,
+   "weekday_hour_median_MAE": 13.0
+  }
+ },
+ "range": {
+  "as trained": {
+   "share_below_p10": 0.12,
+   "share_within_p10_p90": 0.766,
+   "share_above_p90": 0.114,
+   "median_width_min": 25.6,
+   "p50_MAE": 11.42
+  },
+  "app conditions": {
+   "share_below_p10": 0.156,
+   "share_within_p10_p90": 0.653,
+   "share_above_p90": 0.191,
+   "median_width_min": 26.3,
+   "p50_MAE": 14.89
+  }
+ },
+ "breach": {
+  "as trained": {
+   "breach_rate": 0.207,
+   "AUC": 0.88,
+   "F1": 0.592,
+   "share_flagged": 0.409,
+   "precision": 0.446,
+   "recall": 0.881
+  },
+  "app conditions": {
+   "breach_rate": 0.207,
+   "AUC": 0.756,
+   "F1": 0.46,
+   "share_flagged": 0.338,
+   "precision": 0.371,
+   "recall": 0.607
+  }
+ }
+}

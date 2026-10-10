@@ -16,7 +16,7 @@ same-weekday/time-of-day analog rather than rejected, so the twin always has som
 simulate against.
 
 **Trained models** (`Models/`) provide the quantitative core:
-- XGBoost regressor — wait-time estimate
+- LightGBM model — wait-time estimate, P10–P90 range and breach flag
 - Per-category Gaussian HMM — congestion state (Low/Medium/High)
 - LSTM — 15-minute-bucket queue-depth forecast
 
@@ -45,10 +45,10 @@ therefore required everywhere, not just for LLM phrasing — see Environment bel
   ```
 
   Each of the first four specialists reads live twin state and calls a trained model
-  (XGBoost/RAG, HMM, LSTM, allocation heuristics). `predictive_agent` doesn't call a model
+  (LightGBM/RAG, HMM, LSTM, allocation heuristics). `predictive_agent` doesn't call a model
   itself — it fans in after all four complete and analyzes their combined findings into a
   trend-adjusted wait projection, an uncertainty band, a near-term outlook, and an overall
-  operational risk score. `critique` then validates cross-model agreement (e.g. XGBoost vs.
+  operational risk score. `critique` then validates cross-model agreement (e.g. LightGBM vs.
   RAG spread, HMM-vs-forecast consistency) and scores confidence before `decision_support`
   produces prioritized recommendations.
 
@@ -133,6 +133,7 @@ uvicorn app.main:app --reload --port 8000
 | `POST /api/v1/patients/register` | `WaitEstimateGraph` + trained models | Register a patient, triage, pathway, wait estimate |
 | `GET /api/v1/patients` | — | List registered patients |
 | `GET /api/v1/stations/overview` | — | Per-station historical stats + today's registrations |
+| `GET /api/v1/stations/weekly` | — | Per-station historical wait pattern by day of week and hour (Station Overview page) |
 | `POST /api/v1/agent/analyze` | Supervisor multi-agent graph (5 agents) | Full clinic-wide bottleneck/resource/forecast/predictive analysis |
 | `GET /api/v1/agent/dataset-range` | — | Trained-model dataset date range + categories |
 | `POST /api/v1/qa/ask` | SOP & Healthcare Q&A agent | Tool-calling agent answer over ingested SOP documents (requires `OPENAI_API_KEY`) |
@@ -154,7 +155,7 @@ backend/
       qa_graph.py               # LangGraph tool-calling SOP & Healthcare Q&A agent
     services/
       livestate.py              # digital-twin state: queue depth, recent waits, forecasts
-      models_service.py         # loads/serves XGBoost, HMM, LSTM
+      models_service.py         # loads/serves LightGBM, HMM, LSTM
       embedder.py, qdrant_service.py, reranker.py   # wait-event RAG retrieval
       sop_service.py, sop_ingest.py   # SOP-document Qdrant collection (mediq_sop_docs)
       document_registry.py       # SOP document metadata (status, chunk count) for /documents
@@ -166,7 +167,7 @@ backend/
     mine_pathways.py      # mine empirical patient pathways from wait time export
     query_similar.py      # CLI nearest-event check
   run_backend.cmd         # Windows helper to launch the API
-Models/                  # trained model artifacts (XGBoost, HMM, LSTM + metadata)
+Models/                  # trained model artifacts (LightGBM, HMM, LSTM + metadata)
 frontend/                # Next.js dashboard — arrival simulator, registration, station overview,
                           # agent console, SOP Q&A chat, document management
 docs/                    # spec + ADRs

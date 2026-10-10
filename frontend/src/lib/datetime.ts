@@ -12,6 +12,13 @@ export function nowLocal(): string {
   return toLocalInput(new Date());
 }
 
+/** Today's date at the given "HH:mm" time of day. */
+export function todayAt(hhmm: string): string {
+  const [h, mi] = hhmm.split(":").map(Number);
+  const now = new Date();
+  return toLocalInput(new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, mi));
+}
+
 /** The next occurrence of the given time of day that is not in the past:
  *  today if that time is still ahead, otherwise tomorrow. `iso` is any
  *  "YYYY-MM-DDTHH:mm…" timestamp; only its time of day is used. */

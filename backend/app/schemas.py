@@ -19,6 +19,9 @@ class ArrivalRequest(ClinicalContext):
     service_type: str = Field(..., examples=["Consultation", "OCT", "VA"])
     arrival_datetime: datetime
     appointment_datetime: datetime | None = None
+    replay_at: datetime | None = Field(
+        None, description="Golden demo samples: replay clinic state from this historical moment "
+                          "instead of the nearest analog of the arrival time")
 
 
 class SimilarEvent(BaseModel):
@@ -59,6 +62,27 @@ class PatientRegistration(ClinicalContext):
     service_type: str = Field(..., examples=["Consultation", "OCT", "VA"])
     arrival_datetime: datetime
     appointment_datetime: datetime | None = None
+    replay_at: datetime | None = Field(
+        None, description="Golden demo samples: replay clinic state from this historical moment "
+                          "instead of the nearest analog of the arrival time")
+
+
+class GoldenSample(BaseModel):
+    """A curated demo patient whose clinic state is pinned to a historical
+    moment, so every model output is present and repeatable on any day."""
+    id: str
+    label: str
+    story: str
+    display_name: str
+    clinic: str
+    service_type: str
+    category: str
+    arrival_time: str = Field(..., description="HH:MM, combined with today's date in the UI")
+    appointment_time: str = Field(..., description="HH:MM on the same day")
+    replay_at: datetime
+    diagnosis: str
+    medical_history: str
+    current_issue: str
 
 
 class PathwayStep(BaseModel):
@@ -103,7 +127,7 @@ class RegisteredPatient(BaseModel):
     rag_range_min: tuple[float, float] | None = None
     rag_evidence_n: int | None = None
 
-    # model-based queue state (XGBoost / HMM / LSTM), reconstructed from the
+    # model-based queue state (LightGBM / HMM / LSTM), reconstructed from the
     # trained-model dataset. When the arrival time falls outside that
     # dataset's range, clinic state is replayed from the nearest date with
     # the same weekday/time-of-day instead (see livestate.analog_timestamp) —
@@ -112,6 +136,12 @@ class RegisteredPatient(BaseModel):
     model_category: str | None = None
     model_estimate_min: float | None = None
     model_mae_min: float | None = None
+    # P10-P90 range and breach flag (wait over the clinical limit for the
+    # service). Not persisted, so absent from GET /patients.
+    model_range_min: tuple[float, float] | None = None
+    model_breach_limit_min: float | None = None
+    model_breach_probability: float | None = None
+    model_breach_flag: bool | None = None
     model_queue_depth: int | None = None
     model_congestion_state: Literal["Low", "Medium", "High", "unknown"] | None = None
     model_congestion_mean_wait_min: float | None = None
@@ -152,9 +182,12 @@ class QueueSimulationRequest(BaseModel):
     clinic: str = Field(..., examples=["TTSH Eye Centre", "Clinic 1A"])
     category: str = Field(..., examples=["consultation", "visual_acuity", "diagnostic_scan"])
     as_of: datetime = Field(..., description="Any timestamp — mapped to an analog if out of range")
-    visit_position: int | None = Field(None, description="Defaults to the category's typical median")
-    visit_length: int | None = Field(None, description="Defaults to the category's typical median")
-    appointment_lag_min: float = 0.0
+    visit_position: int | None = Field(None, description="Defaults to the station's typical value")
+    appointment_lag_min: float | None = Field(
+        None, description="Arrival minus appointment, in minutes; defaults to the station's typical value")
+    replay_at: datetime | None = Field(
+        None, description="Golden demo samples: replay clinic state from this historical moment "
+                          "instead of the nearest analog of the arrival time")
 
 
 class QueueSimulationResponse(BaseModel):
@@ -167,6 +200,10 @@ class QueueSimulationResponse(BaseModel):
     queue_depth: int
     model_estimate_min: float
     model_mae_min: float
+    model_range_min: tuple[float, float]
+    breach_limit_min: float
+    breach_probability: float
+    breach_flag: bool
     status_band: Literal["green", "amber", "red"]
     congestion_state: Literal["Low", "Medium", "High", "unknown"]
     congestion_mean_wait_min: float | None

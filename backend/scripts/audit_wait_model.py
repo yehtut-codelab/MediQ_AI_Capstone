@@ -72,7 +72,7 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    meta = models_service.wait_meta()
+    meta = models_service.xgb_meta()
     model = models_service._xgb()
     feats = meta["features"]
     lag_lo, lag_hi = meta["appointment_lag_clip"]

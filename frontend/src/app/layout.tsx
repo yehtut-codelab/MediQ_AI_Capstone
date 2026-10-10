@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import { Encode_Sans } from "next/font/google";
+import Link from "next/link";
 import NavLinks from "@/components/NavLinks";
 
 // Encode Sans is the typeface of nhghealth.com.sg, used here for both text and
@@ -19,10 +20,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={encodeSans.variable}>
       <body>
         <nav className="mediq-nav">
-          <div>
+          <Link href="/" className="logo-link" aria-label="MediQ AI — home">
             <div className="logo-name">MediQ AI</div>
             <div className="logo-sub">AI-Driven Digital Twin for Eye Clinic</div>
-          </div>
+          </Link>
           <NavLinks />
         </nav>
         <main className="page">{children}</main>
