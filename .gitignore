@@ -17,6 +17,7 @@ docs/*
 !docs/MediQ_AI_APP_FRAMEWORK_DECISION.md
 !docs/MediQ_AI_APP_PATHWAY_TRIAGE.md
 !docs/MediQ_AI_APP_MODEL_INTEGRATION.md
+!docs/MediQ_AI_Agents_Architecture_Fig2.png
 *.xlsx
 *.parquet
 

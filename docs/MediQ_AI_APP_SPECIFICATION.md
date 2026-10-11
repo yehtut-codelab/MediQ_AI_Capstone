@@ -248,8 +248,9 @@ Models (`Models/`, loaded by `models_service.py`):
 ### 6.2 Supervisor multi-agent graph
 
 Implemented in `backend/app/agents/supervisor_graph.py`, following
-the Figure 2 architecture diagram (`MediQ_AI_Agents_Architecture_Fig2.png`, kept locally,
-not in the repository). One supervisor acts in four phases:
+the Figure 2 architecture diagram
+([`MediQ_AI_Agents_Architecture_Fig2.png`](MediQ_AI_Agents_Architecture_Fig2.png), in this
+folder). One supervisor acts in four phases:
 
 - **supervisor** — reads the objective and delegates, in parallel, only to the specialists
   it calls for. If it cannot tell what is being asked it delegates to nobody and returns a
