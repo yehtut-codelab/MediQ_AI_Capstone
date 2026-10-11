@@ -164,9 +164,8 @@ export default function ArrivalSimulator() {
     if (!serviceType) {
       setResult(null);
       setRagUnavailable(
-        `"${category.replace(/_/g, " ")}" has no equivalent label in the RAG evidence corpus ` +
-          `(Qdrant only covers Consultation, OCT, VA, HVF, Orthoptic, Financial Con) — no ` +
-          `evidence-based estimate available for this category.`
+        `An estimate from similar past patients is not available for ` +
+          `${category.replace(/_/g, " ")} yet. Please use the model estimate below.`
       );
       return;
     }
@@ -184,6 +183,16 @@ export default function ArrivalSimulator() {
           current_issue: currentIssue || null,
         }),
       });
+      // 404 = the corpus holds no past events for this clinic and service at all.
+      if (res.status === 404) {
+        setResult(null);
+        setRagUnavailable(
+          `We don't have enough past ${category.replace(/_/g, " ")} visits at ${clinic} to ` +
+            `estimate from similar patients. Please use the model estimate below, or try ` +
+            `another clinic or service.`
+        );
+        return;
+      }
       if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
       setResult(await res.json());
     } catch (err) {

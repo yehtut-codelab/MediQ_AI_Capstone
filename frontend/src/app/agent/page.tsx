@@ -73,6 +73,11 @@ type Report = {
 // the supervisor decomposes it into the specialists to delegate to.
 const OBJECTIVES = [
   {
+    id: "full",
+    title: "Full clinic review",
+    objective: "Full clinic performance review",
+  },
+  {
     id: "bottlenecks",
     title: "Bottlenecks & resources",
     objective: "Analyse bottlenecks and suggest resource optimization",
@@ -81,11 +86,6 @@ const OBJECTIVES = [
     id: "waiting",
     title: "Waiting time & forecast",
     objective: "Estimate waiting time and forecast the queue",
-  },
-  {
-    id: "full",
-    title: "Full clinic review",
-    objective: "Full clinic performance review",
   },
 ] as const;
 

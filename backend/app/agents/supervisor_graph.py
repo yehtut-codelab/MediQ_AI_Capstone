@@ -76,10 +76,10 @@ DEFAULT_OBJECTIVE = "Analyse bottlenecks and suggest resource optimization"
 # Objectives the supervisor knows how to decompose; offered as the choices when
 # it has to ask the user what they meant. The ids match the console's presets.
 PRESET_OBJECTIVES = [
+    {"id": "full", "title": "Full clinic review", "objective": "Full clinic performance review"},
     {"id": "bottlenecks", "title": "Bottlenecks & resources", "objective": DEFAULT_OBJECTIVE},
     {"id": "waiting", "title": "Waiting time & forecast",
      "objective": "Estimate waiting time and forecast the queue"},
-    {"id": "full", "title": "Full clinic review", "objective": "Full clinic performance review"},
 ]
 
 
