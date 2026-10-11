@@ -3,7 +3,7 @@
 
 **Project**: NUS-ISS Capstone · Team 2
 **Date**: 2026-07-08 (v1.0) · **Last updated**: 2026-10-11 (v1.2, brought in line with the built system)
-**Companion documents**: `FRAMEWORK_DECISION.md` (ADR-001), `PATHWAY_TRIAGE.md` (triage and
+**Companion documents**: `MediQ_AI_APP_FRAMEWORK_DECISION.md` (ADR-001), `MediQ_AI_APP_PATHWAY_TRIAGE.md` (triage and
 pathway prediction), the repository `README.md` (setup and full endpoint list).
 The dashboard's original visual reference, `ttsh_eye_clinic_digital_twin_v3_2.html`, is kept
 locally and is not in the repository.
@@ -30,7 +30,7 @@ The system uses two datasets. Neither is committed (see NFR-3).
 
 `TTSH Oct 25 - 04 May 26 - WaitTimeAdded.xlsx` — 237,190 station-visit events,
 2025-10-01 → 2026-05-04, single sheet. It is embedded into Qdrant (§3.1) and mined for
-patient pathways (`PATHWAY_TRIAGE.md`).
+patient pathways (`MediQ_AI_APP_PATHWAY_TRIAGE.md`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -282,7 +282,7 @@ score is below `qa_covered_min_score`. The page is for staff. API: `/api/v1/qa/*
 
 `POST /api/v1/patients/register` runs rule-based triage (P1–P3), predicts the visit
 pathway, and returns the LightGBM estimate as the headline with the RAG estimate as
-supporting evidence. See `PATHWAY_TRIAGE.md`.
+supporting evidence. See `MediQ_AI_APP_PATHWAY_TRIAGE.md`.
 
 ## 7. Evaluation
 
@@ -305,4 +305,4 @@ supporting evidence. See `PATHWAY_TRIAGE.md`.
   against a global median and a per-station rolling median.
 - Resolve the date mismatch between the two datasets (§2.2) so the model and RAG estimates
   can be evaluated on the same period.
-- Pathway accuracy and total-visit-time error (`PATHWAY_TRIAGE.md` §7).
+- Pathway accuracy and total-visit-time error (`MediQ_AI_APP_PATHWAY_TRIAGE.md` §7).

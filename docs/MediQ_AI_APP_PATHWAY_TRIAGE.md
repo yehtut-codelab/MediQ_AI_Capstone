@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-08 · **Last reviewed against the code:** 2026-10-11
 **Scope:** Registration flow (`POST /api/v1/patients/register`), register page (`/register`)
-**Related:** `docs/SPECIFICATION.md`, `docs/FRAMEWORK_DECISION.md` (ADR-001)
+**Related:** `docs/MediQ_AI_APP_SPECIFICATION.md`, `docs/MediQ_AI_APP_FRAMEWORK_DECISION.md` (ADR-001)
 
 ## 1. Motivation
 

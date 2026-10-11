@@ -5,7 +5,7 @@ live simulation of queue depth, congestion, and wait times for any clinic/catego
 and a set of **LangGraph** agents orchestrate trained ML models and retrieval-augmented
 evidence into wait estimates, bottleneck alerts, and operational recommendations.
 
-📄 Docs: [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) · [`docs/FRAMEWORK_DECISION.md`](docs/FRAMEWORK_DECISION.md) · [`docs/PATHWAY_TRIAGE.md`](docs/PATHWAY_TRIAGE.md)
+📄 Docs: [`docs/MediQ_AI_APP_SPECIFICATION.md`](docs/MediQ_AI_APP_SPECIFICATION.md) · [`docs/MediQ_AI_APP_FRAMEWORK_DECISION.md`](docs/MediQ_AI_APP_FRAMEWORK_DECISION.md) · [`docs/MediQ_AI_APP_PATHWAY_TRIAGE.md`](docs/MediQ_AI_APP_PATHWAY_TRIAGE.md)
 
 ## Architecture
 
