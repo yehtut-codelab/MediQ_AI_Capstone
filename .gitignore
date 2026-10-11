@@ -3,7 +3,10 @@ data/
 data/raw/
 data/processed/
 Clean_Dataset/
-docs/
+docs/*
+!docs/SPECIFICATION.md
+!docs/FRAMEWORK_DECISION.md
+!docs/PATHWAY_TRIAGE.md
 *.xlsx
 *.parquet
 
