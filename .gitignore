@@ -1,3 +1,12 @@
+# repo root: loose files stay local. Only the README is tracked, plus the two
+# files the repo cannot work without (.gitignore, docker-compose.yml).
+# Folders are unaffected — the rules below decide what is ignored inside them.
+/*
+!/*/
+!/README.md
+!/.gitignore
+!/docker-compose.yml
+
 # data — never commit patient data or derivatives
 data/
 data/raw/
