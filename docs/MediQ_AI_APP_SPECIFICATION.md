@@ -4,7 +4,7 @@
 **Project**: NUS-ISS Capstone · Team 2
 **Date**: 2026-07-08 (v1.0) · **Last updated**: 2026-10-11 (v1.2, brought in line with the built system)
 **Companion documents**: `MediQ_AI_APP_FRAMEWORK_DECISION.md` (ADR-001), `MediQ_AI_APP_PATHWAY_TRIAGE.md` (triage and
-pathway prediction), the repository `README.md` (setup and full endpoint list).
+pathway prediction), `MediQ_AI_APP_MODEL_INTEGRATION.md` (how the trained models are wired in), the repository `README.md` (setup and full endpoint list).
 The dashboard's original visual reference, `ttsh_eye_clinic_digital_twin_v3_2.html`, is kept
 locally and is not in the repository.
 
@@ -49,8 +49,9 @@ patient pathways (`MediQ_AI_APP_PATHWAY_TRIAGE.md`).
 
 `Clean_Dataset/cleaned_events.csv` — 405,600 station-visit events, 2024-10-01 → 2025-09-30,
 with a `service_category` column (visual_acuity, consultation, diagnostic_scan, biometry,
-visual_field_test, refraction, laser_procedure, treatment, other). The LightGBM, HMM and
-LSTM models were trained on it, and the digital twin replays it as clinic state (§6.1).
+visual_field_test, refraction, laser_procedure, treatment, other). The digital twin
+replays it as clinic state (§6.1) to build the trained models' inputs. The LightGBM
+model's own training data is longer than this file: 649,488 events, 2023-10-02 → 2025-05-30. See `MediQ_AI_APP_MODEL_INTEGRATION.md`.
 
 The two datasets cover different periods. The RAG evidence comes from 2025-10 onwards, the
 models and the twin from the year before. This mismatch is not resolved (see §7).

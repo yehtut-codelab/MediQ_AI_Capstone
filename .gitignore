@@ -7,6 +7,7 @@ docs/*
 !docs/MediQ_AI_APP_SPECIFICATION.md
 !docs/MediQ_AI_APP_FRAMEWORK_DECISION.md
 !docs/MediQ_AI_APP_PATHWAY_TRIAGE.md
+!docs/MediQ_AI_APP_MODEL_INTEGRATION.md
 *.xlsx
 *.parquet
 
