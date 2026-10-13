@@ -240,7 +240,7 @@ DATA_FILE=../data/raw/TTSH Oct 25 - 04 May 26 - WaitTimeAdded.xlsx
 # Required everywhere — embeddings (wait-event + SOP RAG search) and LLM phrasing/Q&A
 # all call the OpenAI API. There is no local/offline fallback.
 OPENAI_API_KEY=
-LLM_MODEL=gpt-5.5                    # OpenAI model used wherever an LLM is called
+LLM_MODEL=gpt-6-luna                 # OpenAI model used wherever an LLM is called
 EMBEDDING_MODEL=text-embedding-3-small
 EMBEDDING_DIM=1536                   # must match EMBEDDING_MODEL's output size —
                                       # changing either requires --recreate on both

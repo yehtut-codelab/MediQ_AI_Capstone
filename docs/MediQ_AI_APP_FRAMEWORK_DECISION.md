@@ -51,7 +51,7 @@ workflow with LLM reasoning steps** — not an open-ended multi-agent conversati
 
 - Dependencies: `langgraph`, `langchain-core`, `langchain-openai`, `qdrant-client`.
 - The LLM provider is OpenAI, called through `langchain-openai` (`ChatOpenAI`); the model is
-  set by `LLM_MODEL`. Embeddings use the same OpenAI account, so `OPENAI_API_KEY` is required.
+  set by `LLM_MODEL` (default `gpt-6-luna`). Embeddings use the same OpenAI account, so `OPENAI_API_KEY` is required.
 - If the project later needs true multi-agent negotiation (e.g., separate scheduler +
   resource-allocation agents debating), LangGraph supports subgraphs — no migration needed.
 

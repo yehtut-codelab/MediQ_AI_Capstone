@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     embedding_dim: int = 1536
     data_file: Path = Path("../data/raw/TTSH Oct 25 - 04 May 26 - WaitTimeAdded.xlsx")
     openai_api_key: str = ""
-    llm_model: str = "gpt-5.5"
+    llm_model: str = "gpt-6-luna"
     cors_origins: str = "http://localhost:3000"
 
     # ingestion data-quality bounds (spec DQ-2)
